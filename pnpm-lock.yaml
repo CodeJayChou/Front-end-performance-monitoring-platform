@@ -41,8 +41,44 @@ importers:
       '@monitor/sdk-core':
         specifier: workspace:*
         version: link:../../packages/sdk-core
+      '@monitor/sdk-error':
+        specifier: workspace:*
+        version: link:../../packages/sdk-error
+      '@monitor/sdk-performance':
+        specifier: workspace:*
+        version: link:../../packages/sdk-performance
+      '@monitor/sdk-replay':
+        specifier: workspace:*
+        version: link:../../packages/sdk-replay
 
   packages/sdk-core:
+    dependencies:
+      '@monitor/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@monitor/types':
+        specifier: workspace:*
+        version: link:../types
+
+  packages/sdk-error:
+    dependencies:
+      '@monitor/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/sdk-performance:
+    dependencies:
+      '@monitor/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/sdk-replay:
+    dependencies:
+      '@monitor/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/shared:
     dependencies:
       '@monitor/types':
         specifier: workspace:*

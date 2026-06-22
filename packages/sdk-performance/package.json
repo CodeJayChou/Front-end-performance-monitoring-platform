@@ -1,5 +1,5 @@
 {
-  "name": "@monitor/sdk-core",
+  "name": "@monitor/sdk-performance",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -17,7 +17,6 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
-    "@monitor/shared": "workspace:*",
-    "@monitor/types": "workspace:*"
+    "@monitor/shared": "workspace:*"
   }
 }

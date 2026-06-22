@@ -11,6 +11,9 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
-    "@monitor/sdk-core": "workspace:*"
+    "@monitor/sdk-core": "workspace:*",
+    "@monitor/sdk-error": "workspace:*",
+    "@monitor/sdk-performance": "workspace:*",
+    "@monitor/sdk-replay": "workspace:*"
   }
 }
