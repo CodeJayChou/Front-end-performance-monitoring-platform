@@ -1,5 +1,5 @@
 {
-  "name": "@monitor/sdk-core",
+  "name": "@monitor/transport",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,8 +18,6 @@
   },
   "dependencies": {
     "@monitor/types": "workspace:*",
-    "@monitor/shared": "workspace:*",
-    "@monitor/event-contract": "workspace:*",
-    "@monitor/transport": "workspace:*"
+    "@monitor/shared": "workspace:*"
   }
 }

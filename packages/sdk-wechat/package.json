@@ -1,5 +1,5 @@
 {
-  "name": "@monitor/sdk-core",
+  "name": "@monitor/sdk-wechat",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -17,9 +17,7 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
-    "@monitor/types": "workspace:*",
-    "@monitor/shared": "workspace:*",
-    "@monitor/event-contract": "workspace:*",
-    "@monitor/transport": "workspace:*"
+    "@monitor/sdk-core": "workspace:*",
+    "@monitor/event-contract": "workspace:*"
   }
 }
