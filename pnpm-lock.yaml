@@ -51,6 +51,10 @@ importers:
       '@monitor/sdk-web':
         specifier: workspace:*
         version: link:../../packages/sdk-web
+    devDependencies:
+      vite:
+        specifier: ^5.4.0
+        version: 5.4.21(@types/node@22.20.0)
 
   apps/ingest-gateway:
     dependencies:
