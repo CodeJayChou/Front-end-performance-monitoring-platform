@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BaseEvent } from "@monitor/event-contract";
-import { MiddlewarePipeline } from "./MiddlewarePipeline";
+import { MiddlewarePipeline, MiddlewareType } from "./MiddlewarePipeline";
 
 const makeEvent = (overrides: Partial<BaseEvent> = {}): BaseEvent => ({
   id: "id-1",
@@ -41,6 +41,33 @@ describe("MiddlewarePipeline", () => {
 
     await pipeline.execute(makeEvent());
     expect(order).toEqual(["high", "low"]);
+  });
+
+  it("阶段序优先于 priority：POLICY 永远晚于 CONTEXTUAL，即便 priority 更高", async () => {
+    const order: string[] = [];
+    const pipeline = new MiddlewarePipeline();
+    // 先注册高 priority 的 POLICY，再注册低 priority 的 CONTEXTUAL
+    pipeline.use({
+      name: "policy",
+      type: MiddlewareType.POLICY,
+      priority: 999,
+      handle: (e, next) => (order.push("policy"), next(e)),
+    });
+    pipeline.use({
+      name: "ctx",
+      type: MiddlewareType.CONTEXTUAL,
+      priority: 1,
+      handle: (e, next) => (order.push("ctx"), next(e)),
+    });
+    pipeline.use({
+      name: "struct",
+      type: MiddlewareType.STRUCTURAL,
+      priority: 0,
+      handle: (e, next) => (order.push("struct"), next(e)),
+    });
+
+    await pipeline.execute(makeEvent());
+    expect(order).toEqual(["struct", "ctx", "policy"]);
   });
 
   it("同优先级保持注册顺序（稳定排序）", async () => {

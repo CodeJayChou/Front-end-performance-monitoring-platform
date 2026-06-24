@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BaseEvent } from "@monitor/event-contract";
 import { Client } from "./Client";
+import { Monitor } from "../hub/Monitor";
 import type { Integration } from "../integration/Integration";
 
 const makeEvent = (overrides: Partial<BaseEvent> = {}): BaseEvent => ({
@@ -132,6 +133,57 @@ describe("Client", () => {
     await client.capture(makeEvent());
 
     expect(transport.send).not.toHaveBeenCalled();
+  });
+
+  it("结构非法事件（缺 type）在校验阶段被丢弃，不会 send", async () => {
+    const transport = { send: vi.fn() };
+    const client = new Client({ platform: "web", transport });
+
+    // 故意构造缺 type 的脏事件
+    await client.capture({ id: "x", payload: {} } as unknown as BaseEvent);
+
+    expect(transport.send).not.toHaveBeenCalled();
+  });
+
+  it("Monitor 与 client.capture 共享同一 Scope（context 单点）", async () => {
+    const transport = { send: vi.fn() };
+    const client = new Client({ platform: "web", transport });
+    const monitor = new Monitor(client);
+
+    // 经 Monitor 写上下文，直采路径也应看见 —— 证明只有一套 Scope
+    monitor.configureScope((scope) => scope.setUser({ id: "shared" }));
+    await client.capture(makeEvent());
+
+    expect(transport.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ user: { id: "shared" } }),
+      }),
+    );
+    // Monitor 复用 Client 的唯一 Hub，而非另建
+    expect(monitor.hub).toBe(client.getHub());
+  });
+
+  it("close() 会调用每个插件的 teardown", () => {
+    const client = new Client({ platform: "web" });
+    const teardown = vi.fn();
+    const integration: Integration = { name: "t", setup: () => {}, teardown };
+    client.use(integration);
+
+    client.close();
+
+    expect(teardown).toHaveBeenCalledTimes(1);
+  });
+
+  it("debug 模式下打印事件流", async () => {
+    const transport = { send: vi.fn() };
+    const client = new Client({ platform: "web", transport, debug: true });
+
+    await client.capture(makeEvent());
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[SDK FLOW]"),
+      expect.anything(),
+    );
   });
 
   it("registerIntegration + setupIntegrations 会调用插件 setup 并传入自身", () => {

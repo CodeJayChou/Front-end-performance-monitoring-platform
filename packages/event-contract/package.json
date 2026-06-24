@@ -16,7 +16,5 @@
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist .turbo"
   },
-  "dependencies": {
-    "@monitor/types": "workspace:*"
-  }
+  "dependencies": {}
 }

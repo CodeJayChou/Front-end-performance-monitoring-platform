@@ -1,6 +1,6 @@
 import type { BaseEvent } from "@monitor/event-contract";
 import { Transaction } from "@monitor/event-contract";
-import type { Client } from "./Client";
+import type { Client } from "../client/Client";
 import { Scope } from "./Scope";
 
 /**
@@ -8,10 +8,11 @@ import { Scope } from "./Scope";
  *
  * 职责三件事：
  *  1. 管理 Scope 栈（push/pop 支持 modal / route 嵌套，互不污染）；
- *  2. 采集事件时用「当前 Scope」注入上下文 + trace 后交给 Client；
+ *  2. applyToEvent —— **全局唯一的 context/trace 注入点**（由 Client.capture 调用）；
  *  3. 开启 Transaction 并绑定到当前 Scope，实现链路追踪。
  *
  * 一句话：Hub 管生命周期，Scope 管上下文，Transaction 管链路。
+ * context 单点化：Client 持有唯一的 Hub，所有采集路径都经它注入，杜绝多入口。
  */
 export class Hub {
   private readonly stack: Scope[] = [];
@@ -58,10 +59,20 @@ export class Hub {
     fn(this.getScope());
   }
 
-  /** 采集事件：当前 Scope 注入上下文 + trace 后交给 Client 处理。 */
+  /**
+   * 用当前 Scope 给事件注入 context + trace —— 全局唯一注入点。
+   * 由 Client.capture 在 pipeline 之前调用；事件自带 context 优先级更高。
+   */
+  applyToEvent(event: BaseEvent): BaseEvent {
+    return this.getScope().applyToEvent(event);
+  }
+
+  /**
+   * 采集事件：直接转交 Client（context 注入由 Client.capture 经本 Hub 统一完成）。
+   * 这里不再自行 applyToEvent，避免与 Client 形成双重注入。
+   */
   captureEvent(event: BaseEvent): Promise<void> {
-    const finalEvent = this.getScope().applyToEvent(event);
-    return this.client.capture(finalEvent);
+    return this.client.capture(event);
   }
 
   /** 开启一个 Transaction 并绑定到当前 Scope。 */

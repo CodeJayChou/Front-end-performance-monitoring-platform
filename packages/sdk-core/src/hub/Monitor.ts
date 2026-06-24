@@ -1,17 +1,20 @@
 import type { BaseEvent, Transaction } from "@monitor/event-contract";
-import type { Client } from "./Client";
-import { Hub } from "./Hub";
+import type { Client } from "../client/Client";
+import type { Hub } from "./Hub";
 import type { Scope } from "./Scope";
 
 /**
  * Monitor —— 全局入口门面（类比 Sentry 命名空间 API）。
  * 在 Hub 之上提供最常用的几个动作，业务侧不必直接接触 Hub。
+ *
+ * 复用 Client 持有的唯一 Hub（不再另建），保证 Monitor 与 client.capture
+ * 共享同一套 Scope 栈 —— context 单点化。
  */
 export class Monitor {
   readonly hub: Hub;
 
   constructor(client: Client) {
-    this.hub = new Hub(client);
+    this.hub = client.getHub();
   }
 
   /** 采集事件（自动注入当前 Scope 的上下文 + trace）。 */

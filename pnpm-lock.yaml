@@ -68,11 +68,7 @@ importers:
 
   apps/replay-worker: {}
 
-  packages/event-contract:
-    dependencies:
-      '@monitor/types':
-        specifier: workspace:*
-        version: link:../types
+  packages/event-contract: {}
 
   packages/sdk-core:
     dependencies:
@@ -82,12 +78,6 @@ importers:
       '@monitor/shared':
         specifier: workspace:*
         version: link:../shared
-      '@monitor/transport':
-        specifier: workspace:*
-        version: link:../transport
-      '@monitor/types':
-        specifier: workspace:*
-        version: link:../types
 
   packages/sdk-react:
     dependencies:
@@ -116,22 +106,7 @@ importers:
         specifier: workspace:*
         version: link:../sdk-core
 
-  packages/shared:
-    dependencies:
-      '@monitor/types':
-        specifier: workspace:*
-        version: link:../types
-
-  packages/transport:
-    dependencies:
-      '@monitor/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@monitor/types':
-        specifier: workspace:*
-        version: link:../types
-
-  packages/types: {}
+  packages/shared: {}
 
 packages:
 

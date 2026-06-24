@@ -2,9 +2,10 @@ import { Client } from "./client/Client";
 import type { BeforeSend } from "./client/Client";
 import type { Integration } from "./integration/Integration";
 import type { Transport } from "./transport/Transport";
+import { HttpTransport } from "./transport/HttpTransport";
 
 export interface SDKOptions {
-  /** 上报地址（第一阶段未使用，预留） */
+  /** 上报地址；提供后默认走 HttpTransport（fetch + keepalive）上报到该地址 */
   dsn?: string;
   /** 来源端标识，默认 "web" */
   platform?: string;
@@ -16,6 +17,8 @@ export interface SDKOptions {
   integrations?: Integration[];
   /** 发送前钩子：可改写或丢弃事件 */
   beforeSend?: BeforeSend;
+  /** 调试模式：打印事件流（integration → scope → middleware → transport） */
+  debug?: boolean;
 }
 
 /**
@@ -24,11 +27,17 @@ export interface SDKOptions {
  * init(options) → new Client → 注册 integrations → setupIntegrations。
  */
 export function init(options: SDKOptions = {}): Client {
+  // 出口选择：显式 transport 优先；否则有 dsn 走 HttpTransport，最后回落 ConsoleTransport（Client 内部默认）。
+  const transport =
+    options.transport ??
+    (options.dsn ? new HttpTransport({ endpoint: options.dsn }) : undefined);
+
   const client = new Client({
     platform: options.platform || "web",
     sampleRate: options.sampleRate,
-    transport: options.transport,
+    transport,
     beforeSend: options.beforeSend,
+    debug: options.debug,
   });
 
   // 1. 注册 integrations
@@ -44,27 +53,30 @@ export function init(options: SDKOptions = {}): Client {
 
 export { Client } from "./client/Client";
 export type { ClientConfig, BeforeSend } from "./client/Client";
-export { Hub } from "./client/Hub";
-export { Monitor } from "./client/Monitor";
-export { Scope } from "./client/Scope";
-export type { Breadcrumb } from "./client/Scope";
+export { Hub } from "./hub/Hub";
+export { Monitor } from "./hub/Monitor";
+export { Scope } from "./hub/Scope";
+export type { Breadcrumb } from "./hub/Scope";
 export type { Integration } from "./integration/Integration";
 export { IntegrationManager } from "./integration/IntegrationManager";
 export { IntegrationRegistry } from "./integration/registry";
 export { DynamicLoader } from "./integration/DynamicLoader";
 export type { Transport } from "./transport/Transport";
 export { ConsoleTransport } from "./transport/ConsoleTransport";
-export { MiddlewarePipeline } from "./pipeline/MiddlewarePipeline";
-export type { Middleware, Next } from "./pipeline/MiddlewarePipeline";
+export { HttpTransport } from "./transport/HttpTransport";
+export type { HttpTransportOptions } from "./transport/HttpTransport";
+export { MiddlewarePipeline, MiddlewareType } from "./middleware/MiddlewarePipeline";
+export type { Middleware, Next, MiddlewareTap } from "./middleware/MiddlewarePipeline";
 export {
   BUILTIN_PRIORITY,
   createNormalizeMiddleware,
-  createEnrichMiddleware,
   createFilterMiddleware,
   createSampleMiddleware,
-} from "./pipeline/builtins";
-export { contextMiddleware } from "./pipeline/contextMiddleware";
-export { normalize } from "./pipeline/normalize";
-export { enrich } from "./pipeline/enrich";
-export { filter } from "./pipeline/filter";
-export { sample } from "./pipeline/sampling";
+} from "./middleware/builtins";
+export { contextMiddleware } from "./middleware/contextMiddleware";
+export { normalize } from "./middleware/normalize";
+export { filter } from "./middleware/filter";
+export { sample } from "./middleware/sampling";
+// event-contract 再导出：让使用方从单一入口拿到核心契约
+export type { BaseEvent, EventType, TraceContext } from "@monitor/event-contract";
+export { createEvent, validateEvent } from "@monitor/event-contract";

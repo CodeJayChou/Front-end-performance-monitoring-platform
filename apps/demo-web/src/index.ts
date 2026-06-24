@@ -10,7 +10,7 @@ const client = initWebSDK({
   },
 });
 
-// 写入上下文：会被 pipeline 的 enrich 阶段合并进每个事件
+// 写入上下文：capture 时由 Scope.applyToEvent 注入进每个事件（pipeline 之前）
 client.scope.setUser({ id: "u_1001" }).setRoute("/home");
 client.scope.addBreadcrumb("page load");
 

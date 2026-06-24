@@ -1,44 +1,35 @@
-import type { Scope } from "../client/Scope";
 import type { Middleware } from "./MiddlewarePipeline";
+import { MiddlewareType } from "./MiddlewarePipeline";
 import { normalize } from "./normalize";
-import { enrich } from "./enrich";
 import { filter } from "./filter";
 import { sample } from "./sampling";
 
 /**
- * 内置 middleware 的优先级。
- * 保证默认链路顺序为 normalize → enrich → filter → sample；
- * 数值留有余量，用户自定义 middleware 可通过更高/更低优先级插到链路任意位置。
+ * 内置 middleware 的同阶段优先级（仅在各自 MiddlewareType 组内生效）。
+ * 阶段序由 MiddlewareType 决定：STRUCTURAL → CONTEXTUAL → POLICY；
+ * 这里的数值用于 POLICY 组内让 filter 先于 sample。
  */
 export const BUILTIN_PRIORITY = {
   normalize: 100,
-  enrich: 90,
   filter: 80,
   sample: 70,
 } as const;
 
-/** normalize middleware：补齐 timestamp / platform / context。 */
+/** normalize middleware（STRUCTURAL）：补齐 timestamp / platform / context。 */
 export function createNormalizeMiddleware(platform: string): Middleware {
   return {
     name: "normalize",
+    type: MiddlewareType.STRUCTURAL,
     priority: BUILTIN_PRIORITY.normalize,
     handle: (event, next) => next(normalize(event, platform)),
   };
 }
 
-/** enrich middleware：把 Scope 上下文合并进事件。 */
-export function createEnrichMiddleware(scope: Scope): Middleware {
-  return {
-    name: "enrich",
-    priority: BUILTIN_PRIORITY.enrich,
-    handle: (event, next) => next(enrich(event, scope)),
-  };
-}
-
-/** filter middleware：丢弃结构非法的事件。 */
+/** filter middleware（POLICY）：丢弃结构非法的事件。 */
 export function createFilterMiddleware(): Middleware {
   return {
     name: "filter",
+    type: MiddlewareType.POLICY,
     priority: BUILTIN_PRIORITY.filter,
     handle: async (event, next) => {
       const filtered = filter(event);
@@ -48,10 +39,11 @@ export function createFilterMiddleware(): Middleware {
   };
 }
 
-/** sample middleware：按采样率决定是否保留事件。 */
+/** sample middleware（POLICY）：按采样率决定是否保留事件。 */
 export function createSampleMiddleware(rate: number): Middleware {
   return {
     name: "sample",
+    type: MiddlewareType.POLICY,
     priority: BUILTIN_PRIORITY.sample,
     handle: async (event, next) => {
       const sampled = sample(event, rate);

@@ -13,6 +13,13 @@ export interface Integration {
   /**
    * 可选发送前钩子：在进入 middleware pipeline 之前同步增强 / 丢弃事件。
    * 返回 null 表示该事件被此插件丢弃。
+   *
+   * 约束：插件只能改写 / 丢弃事件，不得在此绕过 middleware 直接操作 transport。
    */
   beforeSend?(event: BaseEvent): BaseEvent | null;
+  /**
+   * 可选卸载钩子：还原 setup 安装的 runtime hooks（解绑监听 / 还原被 patch 的全局方法）。
+   * 由 Client.close() 统一调用，用于 SPA 卸载 / 测试清理，避免重复注册与内存泄漏。
+   */
+  teardown?(): void;
 }

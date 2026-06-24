@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BaseEvent } from "@monitor/event-contract";
-import { Client } from "./Client";
+import { Client } from "../client/Client";
 import { Hub } from "./Hub";
 
 const makeEvent = (overrides: Partial<BaseEvent> = {}): BaseEvent => ({
@@ -17,7 +17,7 @@ describe("Hub", () => {
   it("captureEvent 会用当前 Scope 注入上下文后交给 Client", async () => {
     const transport = { send: vi.fn() };
     const client = new Client({ platform: "web", transport });
-    const hub = new Hub(client);
+    const hub = client.getHub(); // 复用 Client 的唯一 Hub（context 单点）
 
     hub.configureScope((scope) => {
       scope.setUser({ id: "123" }).setTag("env", "prod");
@@ -70,7 +70,7 @@ describe("Hub", () => {
   it("startTransaction 绑定到当前 Scope，event 会带上 trace", async () => {
     const transport = { send: vi.fn() };
     const client = new Client({ platform: "web", transport });
-    const hub = new Hub(client);
+    const hub = client.getHub(); // 复用 Client 的唯一 Hub（context 单点）
 
     const tx = hub.startTransaction("page-load", "navigation");
     const span = tx.startSpan("fetch", "/api/user");

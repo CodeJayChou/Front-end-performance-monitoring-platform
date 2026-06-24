@@ -1,16 +1,18 @@
 import type { BaseEvent } from "@monitor/event-contract";
+import { validateEvent } from "@monitor/event-contract";
 import type { Integration } from "../integration/Integration";
 import type { Transport } from "../transport/Transport";
 import { ConsoleTransport } from "../transport/ConsoleTransport";
-import { Scope } from "./Scope";
-import { MiddlewarePipeline } from "../pipeline/MiddlewarePipeline";
-import type { Middleware } from "../pipeline/MiddlewarePipeline";
+import type { Scope } from "../hub/Scope";
+import { Hub } from "../hub/Hub";
+import { MiddlewarePipeline } from "../middleware/MiddlewarePipeline";
+import type { Middleware } from "../middleware/MiddlewarePipeline";
+import { contextMiddleware } from "../middleware/contextMiddleware";
 import {
   createNormalizeMiddleware,
-  createEnrichMiddleware,
   createFilterMiddleware,
   createSampleMiddleware,
-} from "../pipeline/builtins";
+} from "../middleware/builtins";
 
 /** beforeSend 钩子：可改写事件，返回 null 表示丢弃。 */
 export type BeforeSend = (event: BaseEvent) => BaseEvent | null;
@@ -22,33 +24,49 @@ export interface ClientConfig {
   /** 事件出口，默认 ConsoleTransport。 */
   transport?: Transport;
   beforeSend?: BeforeSend;
+  /** 调试模式：打印事件流（integration → scope → middleware → transport）。 */
+  debug?: boolean;
 }
 
 /**
- * 核心事件控制器。只做一件事：event → middleware pipeline → send。
+ * 核心事件控制器 —— 全平台唯一的事件调度入口。
  *
- * 默认 pipeline 由内置 middleware 组成：normalize → enrich(scope) → filter → sample，
- * 业务侧可通过 addMiddleware 插入自定义处理层。Client 不认识任何具体能力，
- * 能力由 Integration 插件注册进来。
+ * capture() 是唯一真入口，固定执行链：
+ *   validate → integration.beforeSend → Scope 注入（context + trace）
+ *   → middleware pipeline（normalize → context → filter → sample → 自定义）
+ *   → beforeSend → transport.send
+ *
+ * 关键约束：
+ *  - Scope 注入发生在 middleware **之前**，middleware 内不再做 scope merge；
+ *  - 只有 Client 编排 pipeline / transport，integration 不得绕过它直发。
  */
 export class Client {
-  /** 上下文容器，供 enrich 阶段使用，也允许业务侧动态写入。 */
-  readonly scope = new Scope();
+  /** 唯一的上下文容器：Scope 栈 + context/trace 注入。所有采集路径共享它。 */
+  private readonly hub = new Hub(this);
 
   /** 可插拔事件处理链。 */
-  private readonly pipeline = new MiddlewarePipeline();
+  private readonly pipeline: MiddlewarePipeline;
   private readonly integrations: Integration[] = [];
   private readonly transport: Transport;
   private readonly beforeSend?: BeforeSend;
+  private readonly debug: boolean;
 
   constructor(private readonly config: ClientConfig) {
     this.transport = config.transport ?? new ConsoleTransport();
     this.beforeSend = config.beforeSend;
+    this.debug = config.debug ?? false;
 
-    // 装上内置 middleware，构成开箱即用的默认 pipeline
+    this.pipeline = new MiddlewarePipeline(
+      this.debug
+        ? (name, event) => this.log(`middleware:${name}`, event)
+        : undefined,
+    );
+
+    // 默认 pipeline：STRUCTURAL(normalize) → CONTEXTUAL(context) → POLICY(filter, sample)。
+    // 阶段序由 MiddlewareType 保证，注册顺序不影响最终执行顺序。
     this.pipeline
       .use(createNormalizeMiddleware(this.platform))
-      .use(createEnrichMiddleware(this.scope))
+      .use(contextMiddleware)
       .use(createFilterMiddleware())
       .use(createSampleMiddleware(config.sampleRate ?? 1));
   }
@@ -58,9 +76,19 @@ export class Client {
     return this.config.platform;
   }
 
+  /** 唯一的 Hub（上下文 + trace 管理）；Monitor 等应复用它，而非另建。 */
+  getHub(): Hub {
+    return this.hub;
+  }
+
+  /** 当前作用域（栈顶）。业务侧 setUser / setTag / addBreadcrumb 的入口。 */
+  get scope(): Scope {
+    return this.hub.getScope();
+  }
+
   /** 读取上下文容器，便于业务侧 setUser / setTag / addBreadcrumb。 */
   getScope(): Scope {
-    return this.scope;
+    return this.hub.getScope();
   }
 
   /** 追加一个自定义 middleware 到事件处理链。 */
@@ -85,30 +113,63 @@ export class Client {
     integration.setup(this);
   }
 
-  /** 采集一个事件，经 integration 钩子 + middleware pipeline 处理后送出。 */
+  /**
+   * 关闭 Client：卸载所有插件的 runtime hooks（teardown），用于 SPA 卸载 / 测试清理。
+   */
+  close(): void {
+    this.integrations.forEach((integration) => integration.teardown?.());
+  }
+
+  /**
+   * 采集一个事件 —— 平台唯一入口。经校验 → 插件钩子 → Scope 注入 →
+   * middleware → beforeSend 后送出。任一环节判定丢弃即静默返回。
+   */
   async capture(event: BaseEvent): Promise<void> {
-    // 1. integration beforeSend 钩子：进入 pipeline 前的同步增强 / 丢弃
-    let incoming: BaseEvent = event;
+    // 0. 结构校验：脏数据不进入链路
+    if (!validateEvent(event)) {
+      this.log("drop:invalid", event);
+      return;
+    }
+
+    // 1. integration.beforeSend：进入 pipeline 前的同步增强 / 丢弃
+    const guarded = this.runIntegrations(event);
+    if (!guarded) return;
+
+    // 2. context 单点注入：经唯一 Hub 把业务上下文（user/tags/route/breadcrumbs）+ trace 合并进事件
+    const scoped = this.hub.applyToEvent(guarded);
+    this.log("scope", scoped);
+
+    // 3. middleware pipeline：normalize → context → filter → sample → 自定义层
+    const processed = await this.pipeline.execute(scoped);
+    if (!processed) return;
+
+    // 4. beforeSend：最后一次改写 / 丢弃的机会
+    const outgoing = this.beforeSend ? this.beforeSend(processed) : processed;
+    if (!outgoing) return;
+
+    // 5. 出口
+    this.log("transport", outgoing);
+    await this.transport.send(outgoing);
+  }
+
+  /** 依次执行插件 beforeSend；任一返回 null 即丢弃整条事件。 */
+  private runIntegrations(event: BaseEvent): BaseEvent | null {
+    let current: BaseEvent = event;
     for (const integration of this.integrations) {
       if (!integration.beforeSend) continue;
-      const result = integration.beforeSend(incoming);
-      if (!result) return; // 被某个插件丢弃
-      incoming = result;
+      const result = integration.beforeSend(current);
+      if (!result) {
+        this.log(`drop:${integration.name}`, current);
+        return null;
+      }
+      current = result;
     }
+    return current;
+  }
 
-    // 2. middleware pipeline：normalize → enrich → filter → sample → 自定义层
-    const processed = await this.pipeline.execute(incoming);
-    if (!processed) return; // 被某一层丢弃
-
-    // 3. beforeSend 钩子：最后一次改写 / 丢弃的机会
-    let outgoing: BaseEvent = processed;
-    if (this.beforeSend) {
-      const result = this.beforeSend(outgoing);
-      if (!result) return;
-      outgoing = result;
-    }
-
-    // 4. 出口
-    await this.transport.send(outgoing);
+  /** debug 模式下打印事件流，非 debug 时零开销。 */
+  private log(stage: string, event: BaseEvent): void {
+    if (!this.debug) return;
+    console.log(`[SDK FLOW] ${stage}`, event);
   }
 }
