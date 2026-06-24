@@ -45,6 +45,9 @@ importers:
 
   apps/demo-web:
     dependencies:
+      '@monitor/event-contract':
+        specifier: workspace:*
+        version: link:../../packages/event-contract
       '@monitor/sdk-web':
         specifier: workspace:*
         version: link:../../packages/sdk-web

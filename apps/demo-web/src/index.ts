@@ -1,14 +1,27 @@
 import { initWebSDK } from "@monitor/sdk-web";
+import { createEvent } from "@monitor/event-contract";
 
-// 最终用户视角：一行初始化，按需配置 beforeSend
+// 最终用户视角：一行初始化，按需配置采样率 / beforeSend
 const client = initWebSDK({
+  sampleRate: 1, // 全量上报
   beforeSend(event) {
     // 这里可做：过滤敏感数据 / 采样 / 返回 null 丢弃事件
     return event;
   },
 });
 
+// 写入上下文：会被 pipeline 的 enrich 阶段合并进每个事件
+client.scope.setUser({ id: "u_1001" }).setRoute("/home");
+client.scope.addBreadcrumb("page load");
+
 console.log("[demo] SDK initialized", client.platform);
 
-// 触发一个未捕获错误，验证整条链路（浏览器中会被 GlobalError 插件捕获）
-throw new Error("test error");
+// 验证整条链路：
+// - 浏览器环境：抛出未捕获错误，由 GlobalError 插件经 window.onerror 自动捕获
+// - Node/dev 环境：无 window，直接 capture 一条 error 事件，避免进程崩溃
+const isBrowser = typeof (globalThis as { window?: unknown }).window !== "undefined";
+if (isBrowser) {
+  throw new Error("test error");
+} else {
+  client.capture(createEvent("error", { message: "test error" }, client.platform));
+}

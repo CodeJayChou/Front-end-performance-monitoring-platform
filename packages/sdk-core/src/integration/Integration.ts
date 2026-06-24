@@ -1,3 +1,4 @@
+import type { BaseEvent } from "@monitor/event-contract";
 import type { Client } from "../client/Client";
 
 /**
@@ -9,4 +10,9 @@ export interface Integration {
   name: string;
   /** 注册到 Client 时调用，在此安装 runtime hooks */
   setup(client: Client): void;
+  /**
+   * 可选发送前钩子：在进入 middleware pipeline 之前同步增强 / 丢弃事件。
+   * 返回 null 表示该事件被此插件丢弃。
+   */
+  beforeSend?(event: BaseEvent): BaseEvent | null;
 }
