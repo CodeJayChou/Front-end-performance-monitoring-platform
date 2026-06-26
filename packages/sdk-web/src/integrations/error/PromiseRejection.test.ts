@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("PromiseRejectionIntegration", () => {
-  it("setup 后 unhandledrejection 会 capture 一个 promise_rejection 事件", () => {
+  it("setup 后 unhandledrejection 会 capture 一个 error 事件（kind:promise）", () => {
     stubWindow();
     const capture = vi.fn<(event: BaseEvent) => void>();
     const client = { capture } as unknown as Client;
@@ -38,8 +38,9 @@ describe("PromiseRejectionIntegration", () => {
 
     expect(capture).toHaveBeenCalledTimes(1);
     const event = capture.mock.calls[0]![0];
-    expect(event.type).toBe("promise_rejection");
+    expect(event.type).toBe("error");
     expect(event.payload).toMatchObject({
+      kind: "promise",
       reason: "rejected",
       stack: err.stack,
     });
@@ -54,6 +55,7 @@ describe("PromiseRejectionIntegration", () => {
     listeners.get("unhandledrejection")?.({ reason: "boom" });
 
     expect(capture.mock.calls[0]![0].payload).toMatchObject({
+      kind: "promise",
       reason: "boom",
       stack: undefined,
     });

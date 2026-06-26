@@ -87,7 +87,17 @@ on("fetch-fail", () => {
   void fetch("https://nonexistent.invalid/").catch(() => {});
 });
 
-// 5. 自定义事件：直接走 capture() 入口
+// 5. 资源加载失败：插入一个坏 src 的 img → capture 阶段 'error' → ResourceError 插件
+on("resource-err", () => {
+  console.log("[demo] → 触发资源加载失败 (img)");
+  const img = document.createElement("img");
+  img.className = "demo-broken";
+  // 必然 404 的同源路径，触发资源加载 error（不冒泡，仅 capture 阶段可见）
+  img.src = `/__not_exist__/${performance.now()}.png`;
+  document.body.appendChild(img);
+});
+
+// 6. 自定义事件：直接走 capture() 入口
 on("custom", () => {
   console.log("[demo] → 触发自定义事件 capture()");
   void client.capture(
@@ -95,7 +105,7 @@ on("custom", () => {
   );
 });
 
-// 6. 清空面板
+// 7. 清空面板
 on("clear", () => {
   panel.replaceChildren();
 });

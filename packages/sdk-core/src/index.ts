@@ -51,21 +51,30 @@ export function init(options: SDKOptions = {}): Client {
   return client;
 }
 
+/* ── Client（事件采集入口）────────────────────────────── */
 export { Client } from "./client/Client";
 export type { ClientConfig, BeforeSend } from "./client/Client";
+
+/* ── Hub / Scope（上下文与链路）──────────────────────── */
 export { Hub } from "./hub/Hub";
 export { Monitor } from "./hub/Monitor";
 export { Scope } from "./hub/Scope";
 export type { Breadcrumb } from "./hub/Scope";
+
+/* ── Integration（插件体系）──────────────────────────── */
 export type { Integration } from "./integration/Integration";
 export { BaseIntegration } from "./integration/BaseIntegration";
 export { IntegrationManager } from "./integration/IntegrationManager";
 export { IntegrationRegistry } from "./integration/registry";
 export { DynamicLoader } from "./integration/DynamicLoader";
+
+/* ── Transport（事件出口）────────────────────────────── */
 export type { Transport } from "./transport/Transport";
+export type { HttpTransportOptions } from "./transport/HttpTransport";
 export { ConsoleTransport } from "./transport/ConsoleTransport";
 export { HttpTransport } from "./transport/HttpTransport";
-export type { HttpTransportOptions } from "./transport/HttpTransport";
+
+/* ── Middleware（事件管道）──────────────────────────── */
 export { MiddlewarePipeline, MiddlewareType } from "./middleware/MiddlewarePipeline";
 export type { Middleware, Next, MiddlewareTap } from "./middleware/MiddlewarePipeline";
 export {
@@ -78,6 +87,7 @@ export { contextMiddleware } from "./middleware/contextMiddleware";
 export { normalize } from "./middleware/normalize";
 export { filter } from "./middleware/filter";
 export { sample } from "./middleware/sampling";
-// event-contract 再导出：让使用方从单一入口拿到核心契约
+
+/* ── Event Contract 再导出（单一入口拿到核心契约）────── */
 export type { BaseEvent, EventType, TraceContext } from "@monitor/event-contract";
 export { createEvent, validateEvent } from "@monitor/event-contract";

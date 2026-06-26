@@ -1,7 +1,7 @@
 import type {
   PerformanceMetric,
-  PerformancePayload,
   PerformanceRating,
+  VitalPayload,
 } from "@monitor/event-contract";
 
 /**
@@ -37,7 +37,7 @@ export function rateMetric(
 export function toPerformancePayload(
   metric: PerformanceMetric,
   value: number,
-): PerformancePayload {
+): VitalPayload {
   return { metric, value, rating: rateMetric(metric, value) };
 }
 

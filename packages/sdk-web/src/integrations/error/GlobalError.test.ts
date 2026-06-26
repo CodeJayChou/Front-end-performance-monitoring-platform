@@ -34,6 +34,7 @@ describe("GlobalErrorIntegration", () => {
     const event = capture.mock.calls[0]![0];
     expect(event.type).toBe("error");
     expect(event.payload).toMatchObject({
+      kind: "js",
       message: "boom",
       source: "app.js",
       lineno: 10,

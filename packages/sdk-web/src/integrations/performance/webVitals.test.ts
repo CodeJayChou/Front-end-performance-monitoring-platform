@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { BaseEvent, PerformancePayload } from "@monitor/event-contract";
+import type { BaseEvent, VitalPayload } from "@monitor/event-contract";
 import type { Client } from "@monitor/sdk-core";
 import { rateMetric } from "./webVitals";
 import { FCPIntegration } from "./FCP";
@@ -61,8 +61,8 @@ function hidePage() {
   visListeners.forEach((l) => l());
 }
 
-function payloadOf(capture: ReturnType<typeof vi.fn>): PerformancePayload {
-  return (capture.mock.calls[0]![0] as BaseEvent).payload as PerformancePayload;
+function payloadOf(capture: ReturnType<typeof vi.fn>): VitalPayload {
+  return (capture.mock.calls[0]![0] as BaseEvent).payload as VitalPayload;
 }
 
 afterEach(() => {

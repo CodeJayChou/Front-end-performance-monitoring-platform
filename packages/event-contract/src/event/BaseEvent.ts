@@ -13,7 +13,7 @@ export interface TraceContext {
 
 /**
  * 事件大类。列出的是平台“一等公民”类型，便于补全与归类；
- * `(string & {})` 保留扩展口子：集成可上报更细的子类型（如 "http" / "promise_rejection"），
+ * `(string & {})` 保留扩展口子：集成可上报更细的子类型（如 "http" / "http_error"），
  * 既不丢失字面量提示，也不强行收窄到只能用这几个值。
  */
 export type EventType =

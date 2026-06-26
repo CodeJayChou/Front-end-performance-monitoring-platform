@@ -11,9 +11,20 @@ export type {
 export type {
   PerformanceMetric,
   PerformanceRating,
+  VitalPayload,
+  LongTaskPayload,
   PerformancePayload,
   PerformanceEvent,
 } from "./event/PerformanceEvent";
+export type {
+  ErrorKind,
+  JsErrorPayload,
+  ResourceType,
+  ResourceErrorPayload,
+  PromiseRejectionPayload,
+  ErrorPayload,
+  ErrorEvent,
+} from "./event/ErrorEvent";
 export { Span } from "./trace/Span";
 export type { SpanJSON } from "./trace/Span";
 export { Transaction } from "./trace/Trace";

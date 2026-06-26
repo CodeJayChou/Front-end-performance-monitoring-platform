@@ -103,7 +103,7 @@ describe("web-sdk 端到端流程完整性", () => {
     });
   });
 
-  it("unhandledrejection → promise_rejection 事件落到 transport", async () => {
+  it("unhandledrejection → error 事件（kind:promise）落到 transport", async () => {
     const { sent, transport } = collector();
     initWebSDK({ transport });
 
@@ -113,8 +113,11 @@ describe("web-sdk 端到端流程完整性", () => {
     await flush();
 
     expect(sent).toHaveLength(1);
-    expect(sent[0]!.type).toBe("promise_rejection");
-    expect((sent[0]!.payload as { reason: string }).reason).toBe("rejected");
+    expect(sent[0]!.type).toBe("error");
+    expect(sent[0]!.payload).toMatchObject({
+      kind: "promise",
+      reason: "rejected",
+    });
   });
 
   it("window.fetch → http 事件落到 transport，并带上 trace（事务已开启）", async () => {
