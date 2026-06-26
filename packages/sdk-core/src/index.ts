@@ -3,6 +3,8 @@ import type { BeforeSend } from "./client/Client";
 import type { Integration } from "./integration/Integration";
 import type { Transport } from "./transport/Transport";
 import { HttpTransport } from "./transport/HttpTransport";
+import type { RuntimePlatform } from "./platform/RuntimePlatform";
+import { webPlatform } from "./platform/RuntimePlatform";
 
 export interface SDKOptions {
   /** 上报地址；提供后默认走 HttpTransport（fetch + keepalive）上报到该地址 */
@@ -19,6 +21,8 @@ export interface SDKOptions {
   beforeSend?: BeforeSend;
   /** 调试模式：打印事件流（integration → scope → middleware → transport） */
   debug?: boolean;
+  /** 平台适配口（now / uuid / global）；默认 webPlatform，跨端时由各端注入 */
+  runtime?: RuntimePlatform;
 }
 
 /**
@@ -27,10 +31,14 @@ export interface SDKOptions {
  * init(options) → new Client → 注册 integrations → setupIntegrations。
  */
 export function init(options: SDKOptions = {}): Client {
-  // 出口选择：显式 transport 优先；否则有 dsn 走 HttpTransport，最后回落 ConsoleTransport（Client 内部默认）。
+  const runtime = options.runtime ?? webPlatform;
+
+  // 出口选择：显式 transport 优先；否则有 dsn 走 HttpTransport（共享同一 runtime），最后回落 ConsoleTransport（Client 内部默认）。
   const transport =
     options.transport ??
-    (options.dsn ? new HttpTransport({ endpoint: options.dsn }) : undefined);
+    (options.dsn
+      ? new HttpTransport({ endpoint: options.dsn }, runtime)
+      : undefined);
 
   const client = new Client({
     platform: options.platform || "web",
@@ -38,6 +46,7 @@ export function init(options: SDKOptions = {}): Client {
     transport,
     beforeSend: options.beforeSend,
     debug: options.debug,
+    runtime,
   });
 
   // 1. 注册 integrations
@@ -83,11 +92,26 @@ export {
   createFilterMiddleware,
   createSampleMiddleware,
 } from "./middleware/builtins";
-export { contextMiddleware } from "./middleware/contextMiddleware";
+export {
+  contextMiddleware,
+  createContextMiddleware,
+} from "./middleware/contextMiddleware";
 export { normalize } from "./middleware/normalize";
 export { filter } from "./middleware/filter";
 export { sample } from "./middleware/sampling";
 
+/* ── Platform Adapter（运行时适配口：now / uuid / global）──── */
+export type {
+  RuntimePlatform,
+  RuntimeGlobal,
+} from "./platform/RuntimePlatform";
+export { webPlatform } from "./platform/RuntimePlatform";
+
 /* ── Event Contract 再导出（单一入口拿到核心契约）────── */
-export type { BaseEvent, EventType, TraceContext } from "@monitor/event-contract";
-export { createEvent, validateEvent } from "@monitor/event-contract";
+export type {
+  BaseEvent,
+  EventType,
+  TraceContext,
+  EventRuntime,
+} from "@monitor/event-contract";
+export { createEvent, validateEvent, defaultRuntime } from "@monitor/event-contract";

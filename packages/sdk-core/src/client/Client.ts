@@ -7,12 +7,14 @@ import type { Scope } from "../hub/Scope";
 import { Hub } from "../hub/Hub";
 import { MiddlewarePipeline } from "../middleware/MiddlewarePipeline";
 import type { Middleware } from "../middleware/MiddlewarePipeline";
-import { contextMiddleware } from "../middleware/contextMiddleware";
+import { createContextMiddleware } from "../middleware/contextMiddleware";
 import {
   createNormalizeMiddleware,
   createFilterMiddleware,
   createSampleMiddleware,
 } from "../middleware/builtins";
+import type { RuntimePlatform } from "../platform/RuntimePlatform";
+import { webPlatform } from "../platform/RuntimePlatform";
 
 /** beforeSend 钩子：可改写事件，返回 null 表示丢弃。 */
 export type BeforeSend = (event: BaseEvent) => BaseEvent | null;
@@ -26,6 +28,8 @@ export interface ClientConfig {
   beforeSend?: BeforeSend;
   /** 调试模式：打印事件流（integration → scope → middleware → transport）。 */
   debug?: boolean;
+  /** 平台适配口（now / uuid / global）；默认 webPlatform（globalThis 兜底）。 */
+  runtime?: RuntimePlatform;
 }
 
 /**
@@ -41,8 +45,14 @@ export interface ClientConfig {
  *  - 只有 Client 编排 pipeline / transport，integration 不得绕过它直发。
  */
 export class Client {
-  /** 唯一的上下文容器：Scope 栈 + context/trace 注入。所有采集路径共享它。 */
-  private readonly hub = new Hub(this);
+  /**
+   * 唯一的上下文容器：Scope 栈 + context/trace 注入。所有采集路径共享它。
+   * 在构造体内、runtime 就绪后再创建（Hub 根 Scope 需要 runtime 作为时钟）。
+   */
+  private readonly hub: Hub;
+
+  /** 平台适配口：now / uuid / global 的唯一来源，向下分发给 hub / middleware。 */
+  private readonly runtime: RuntimePlatform;
 
   /** 可插拔事件处理链。 */
   private readonly pipeline: MiddlewarePipeline;
@@ -52,9 +62,13 @@ export class Client {
   private readonly debug: boolean;
 
   constructor(private readonly config: ClientConfig) {
+    this.runtime = config.runtime ?? webPlatform;
     this.transport = config.transport ?? new ConsoleTransport();
     this.beforeSend = config.beforeSend;
     this.debug = config.debug ?? false;
+
+    // runtime 就绪后再建 Hub：根 Scope 的时钟来自它。
+    this.hub = new Hub(this);
 
     this.pipeline = new MiddlewarePipeline(
       this.debug
@@ -65,8 +79,8 @@ export class Client {
     // 默认 pipeline：STRUCTURAL(normalize) → CONTEXTUAL(context) → POLICY(filter, sample)。
     // 阶段序由 MiddlewareType 保证，注册顺序不影响最终执行顺序。
     this.pipeline
-      .use(createNormalizeMiddleware(this.platform))
-      .use(contextMiddleware)
+      .use(createNormalizeMiddleware(this.platform, this.runtime))
+      .use(createContextMiddleware(this.runtime))
       .use(createFilterMiddleware())
       .use(createSampleMiddleware(config.sampleRate ?? 1));
   }
@@ -79,6 +93,11 @@ export class Client {
   /** 唯一的 Hub（上下文 + trace 管理）；Monitor 等应复用它，而非另建。 */
   getHub(): Hub {
     return this.hub;
+  }
+
+  /** 平台适配口（now / uuid / global）；hub / integration 等应复用它，而非直接摸全局。 */
+  getRuntime(): RuntimePlatform {
+    return this.runtime;
   }
 
   /** 当前作用域（栈顶）。业务侧 setUser / setTag / addBreadcrumb 的入口。 */

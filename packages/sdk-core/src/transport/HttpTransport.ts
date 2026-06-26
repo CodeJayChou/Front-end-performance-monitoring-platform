@@ -1,5 +1,7 @@
 import type { BaseEvent } from "@monitor/event-contract";
 import type { Transport } from "./Transport";
+import type { RuntimePlatform } from "../platform/RuntimePlatform";
+import { webPlatform } from "../platform/RuntimePlatform";
 
 export interface HttpTransportOptions {
   /** 上报地址（dsn / ingest endpoint）。 */
@@ -13,11 +15,6 @@ export interface HttpTransportOptions {
   maxRetries?: number;
 }
 
-interface BeaconRuntime {
-  fetch?: typeof fetch;
-  navigator?: { sendBeacon?: (url: string, data?: string) => boolean };
-}
-
 /**
  * HttpTransport —— 网络出口实现（生产级加固版）。
  *
@@ -25,6 +22,9 @@ interface BeaconRuntime {
  *  - keepalive：页面卸载时仍尽力送达；
  *  - 重试：网络失败最多重试 maxRetries 次（默认 2，共 3 次尝试）；
  *  - sendBeacon 兜底：无 fetch 时退化到 navigator.sendBeacon。
+ *
+ * fetch / sendBeacon 从注入的 `RuntimePlatform.global` 取，不再直接摸 `globalThis`，
+ * 故小程序 / RN 只需提供各自的 global（如包装 `wx.request`）即可复用本实现。
  *
  * 设计约束：监控 SDK 绝不能把自身故障抛回宿主应用。
  * 因此这里吞掉所有网络异常，并在无可用出口（SSR / 老旧 runtime）时安全降级。
@@ -34,23 +34,26 @@ export class HttpTransport implements Transport {
   private readonly keepalive: boolean;
   private readonly maxRetries: number;
 
-  constructor(options: HttpTransportOptions) {
+  constructor(
+    options: HttpTransportOptions,
+    private readonly runtime: RuntimePlatform = webPlatform,
+  ) {
     this.endpoint = options.endpoint;
     this.keepalive = options.keepalive ?? true;
     this.maxRetries = options.maxRetries ?? 2;
   }
 
   async send(event: BaseEvent): Promise<void> {
-    const runtime = globalThis as BeaconRuntime;
+    const g = this.runtime.global;
     const body = JSON.stringify(event);
 
-    if (typeof runtime.fetch === "function") {
-      await this.sendWithFetch(runtime.fetch, body);
+    if (typeof g.fetch === "function") {
+      await this.sendWithFetch(g.fetch, body);
       return;
     }
 
     // 无 fetch：退化到 sendBeacon（卸载场景常用），再不行就安全降级。
-    runtime.navigator?.sendBeacon?.(this.endpoint, body);
+    g.navigator?.sendBeacon?.(this.endpoint, body);
   }
 
   /** fetch 上报，失败按 maxRetries 重试；全部失败则 sendBeacon 兜底。 */
@@ -70,10 +73,7 @@ export class HttpTransport implements Transport {
       } catch {
         // 最后一次仍失败：尝试 sendBeacon 兜底，仍失败则放弃（不抛错）。
         if (attempt === this.maxRetries) {
-          (globalThis as BeaconRuntime).navigator?.sendBeacon?.(
-            this.endpoint,
-            body,
-          );
+          this.runtime.global.navigator?.sendBeacon?.(this.endpoint, body);
         }
       }
     }

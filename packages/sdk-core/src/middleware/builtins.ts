@@ -1,3 +1,5 @@
+import type { EventRuntime } from "@monitor/event-contract";
+import { defaultRuntime } from "@monitor/event-contract";
 import type { Middleware } from "./MiddlewarePipeline";
 import { MiddlewareType } from "./MiddlewarePipeline";
 import { normalize } from "./normalize";
@@ -16,12 +18,15 @@ export const BUILTIN_PRIORITY = {
 } as const;
 
 /** normalize middleware（STRUCTURAL）：补齐 timestamp / platform / context。 */
-export function createNormalizeMiddleware(platform: string): Middleware {
+export function createNormalizeMiddleware(
+  platform: string,
+  runtime: EventRuntime = defaultRuntime,
+): Middleware {
   return {
     name: "normalize",
     type: MiddlewareType.STRUCTURAL,
     priority: BUILTIN_PRIORITY.normalize,
-    handle: (event, next) => next(normalize(event, platform)),
+    handle: (event, next) => next(normalize(event, platform, runtime)),
   };
 }
 

@@ -63,8 +63,15 @@ export abstract class BaseIntegration implements Integration {
     this.cleanups.push(fn);
   }
 
-  /** 便捷上报：createEvent + client.capture 一步到位。 */
+  /**
+   * 便捷上报：createEvent + client.capture 一步到位（id/时间/平台均取自 client 的 runtime）。
+   * `getRuntime?.()` 容忍仅实现 capture 的精简 client（测试替身）：缺失时回落契约默认 runtime。
+   */
   protected emit<T>(type: EventType, payload: T): void {
-    this.client?.capture(createEvent(type, payload));
+    const client = this.client;
+    if (!client) return;
+    client.capture(
+      createEvent(type, payload, client.platform, client.getRuntime?.()),
+    );
   }
 }

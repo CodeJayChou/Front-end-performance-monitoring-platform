@@ -1,4 +1,5 @@
-import type { BaseEvent, Transaction } from "@monitor/event-contract";
+import type { BaseEvent, EventRuntime, Transaction } from "@monitor/event-contract";
+import { defaultRuntime } from "@monitor/event-contract";
 
 /**
  * Scope —— 上下文容器（类似 Sentry Scope）。
@@ -23,6 +24,9 @@ export class Scope {
   private breadcrumbs: Breadcrumb[] = [];
   private route?: string;
   private transaction?: Transaction;
+
+  /** 时间原语来源；由 Hub 注入，clone 时透传，保证全链路同一时钟。 */
+  constructor(private readonly runtime: EventRuntime = defaultRuntime) {}
 
   /** 设置当前用户信息。 */
   setUser(user: unknown): this {
@@ -50,7 +54,7 @@ export class Scope {
 
   /** 追加一条行为面包屑（用于还原错误发生前的操作链路）。 */
   addBreadcrumb(message: string): this {
-    this.breadcrumbs.push({ message, timestamp: Date.now() });
+    this.breadcrumbs.push({ message, timestamp: this.runtime.now() });
     return this;
   }
 
@@ -102,7 +106,7 @@ export class Scope {
 
   /** 复制出一份独立 Scope（供 Hub push 嵌套作用域；transaction 引用共享）。 */
   clone(): Scope {
-    const cloned = new Scope();
+    const cloned = new Scope(this.runtime);
     cloned.user = this.user;
     cloned.tags = { ...this.tags };
     cloned.context = { ...this.context };

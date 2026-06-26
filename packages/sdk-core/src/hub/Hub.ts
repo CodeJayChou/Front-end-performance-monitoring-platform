@@ -18,8 +18,8 @@ export class Hub {
   private readonly stack: Scope[] = [];
 
   constructor(private readonly client: Client) {
-    // 栈底始终保留一个根 Scope
-    this.stack.push(new Scope());
+    // 栈底始终保留一个根 Scope；注入 client 的 runtime 作为统一时钟。
+    this.stack.push(new Scope(client.getRuntime()));
   }
 
   /** 当前绑定的 Client。 */
@@ -77,7 +77,7 @@ export class Hub {
 
   /** 开启一个 Transaction 并绑定到当前 Scope。 */
   startTransaction(name: string, op: string): Transaction {
-    const tx = new Transaction(name, op);
+    const tx = new Transaction(name, op, this.client.getRuntime());
     this.getScope().setTransaction(tx);
     return tx;
   }
