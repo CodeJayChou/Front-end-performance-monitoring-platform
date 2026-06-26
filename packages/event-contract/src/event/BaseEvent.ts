@@ -1,3 +1,6 @@
+import type { EventRuntime } from "../runtime";
+import { defaultRuntime } from "../runtime";
+
 /**
  * 链路上下文 —— 把 event 关联到一次 transaction / span。
  * 由 Scope.applyToEvent 在采集时注入，用于 Performance ↔ Error 关联。
@@ -52,11 +55,12 @@ export function createEvent<T>(
   type: EventType,
   payload: T,
   platform = "web",
+  runtime: EventRuntime = defaultRuntime,
 ): BaseEvent<T> {
   return {
-    id: crypto.randomUUID(),
+    id: runtime.uuid(),
     type,
-    timestamp: Date.now(),
+    timestamp: runtime.now(),
     platform,
     context: {},
     payload,

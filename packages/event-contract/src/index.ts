@@ -25,6 +25,8 @@ export type {
   ErrorPayload,
   ErrorEvent,
 } from "./event/ErrorEvent";
+export type { EventRuntime } from "./runtime";
+export { defaultRuntime } from "./runtime";
 export { Span } from "./trace/Span";
 export type { SpanJSON } from "./trace/Span";
 export { Transaction } from "./trace/Trace";

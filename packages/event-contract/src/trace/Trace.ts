@@ -1,5 +1,7 @@
 import { Span } from "./Span";
 import type { SpanJSON } from "./Span";
+import type { EventRuntime } from "../runtime";
+import { defaultRuntime } from "../runtime";
 
 /**
  * Transaction —— 一个完整操作的链路根节点（page load / click / api flow）。
@@ -17,22 +19,28 @@ export interface TransactionJSON {
 }
 
 export class Transaction {
-  readonly id: string = crypto.randomUUID();
+  readonly id: string;
   readonly name: string;
   readonly op: string;
 
-  readonly startTime: number = Date.now();
+  readonly startTime: number;
   endTime?: number;
   readonly spans: Span[] = [];
 
-  constructor(name: string, op: string) {
+  constructor(
+    name: string,
+    op: string,
+    private readonly runtime: EventRuntime = defaultRuntime,
+  ) {
     this.name = name;
     this.op = op;
+    this.id = runtime.uuid();
+    this.startTime = runtime.now();
   }
 
   /** 开启一个子操作 Span，并登记到当前 transaction。 */
   startSpan(op: string, description?: string): Span {
-    const span = new Span(op, description);
+    const span = new Span(op, description, this.runtime);
     this.spans.push(span);
     return span;
   }
@@ -44,7 +52,7 @@ export class Transaction {
 
   /** 结束整个 transaction。 */
   finish(): void {
-    this.endTime = Date.now();
+    this.endTime = this.runtime.now();
   }
 
   toJSON(): TransactionJSON {
@@ -52,7 +60,7 @@ export class Transaction {
       id: this.id,
       name: this.name,
       op: this.op,
-      duration: (this.endTime ?? Date.now()) - this.startTime,
+      duration: (this.endTime ?? this.runtime.now()) - this.startTime,
       spans: this.spans.map((s) => s.toJSON()),
     };
   }
