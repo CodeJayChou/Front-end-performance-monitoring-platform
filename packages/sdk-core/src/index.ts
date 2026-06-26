@@ -58,6 +58,7 @@ export { Monitor } from "./hub/Monitor";
 export { Scope } from "./hub/Scope";
 export type { Breadcrumb } from "./hub/Scope";
 export type { Integration } from "./integration/Integration";
+export { BaseIntegration } from "./integration/BaseIntegration";
 export { IntegrationManager } from "./integration/IntegrationManager";
 export { IntegrationRegistry } from "./integration/registry";
 export { DynamicLoader } from "./integration/DynamicLoader";

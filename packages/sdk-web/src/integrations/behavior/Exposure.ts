@@ -1,6 +1,5 @@
-import type { Client, Integration } from "@monitor/sdk-core";
+import { BaseIntegration } from "@monitor/sdk-core";
 import type { ExposurePayload } from "@monitor/event-contract";
-import { createEvent } from "@monitor/event-contract";
 import { getXPath } from "./dom";
 
 export interface ExposureOptions {
@@ -16,43 +15,37 @@ export interface ExposureOptions {
  * 只观测显式打了选择器标记的元素（默认 `[data-track-exposure]`），
  * 避免全量观测带来的性能与噪音；用 WeakSet 去重，保证“首次曝光只报一次”。
  */
-export class ExposureIntegration implements Integration {
+export class ExposureIntegration extends BaseIntegration {
   name = "Exposure";
 
-  private client?: Client;
-  private observer?: IntersectionObserver;
   private readonly selector: string;
   private readonly threshold: number;
   private readonly seen = new WeakSet<Element>();
 
   constructor(options: ExposureOptions = {}) {
+    super();
     this.selector = options.selector ?? "[data-track-exposure]";
     this.threshold = options.threshold ?? 0.5;
   }
 
-  setup(client: Client): void {
-    // 非浏览器环境，或运行时无 IntersectionObserver 时安全降级
-    if (
-      typeof window === "undefined" ||
-      typeof document === "undefined" ||
-      typeof IntersectionObserver === "undefined"
-    ) {
-      return;
-    }
+  /** 需要 document + IntersectionObserver，运行时缺任一即安全降级。 */
+  protected isSupported(): boolean {
+    return (
+      typeof window !== "undefined" &&
+      typeof document !== "undefined" &&
+      typeof IntersectionObserver !== "undefined"
+    );
+  }
 
-    this.client = client;
-    this.observer = new IntersectionObserver(this.onIntersect, {
+  protected install(): void {
+    const observer = new IntersectionObserver(this.onIntersect, {
       threshold: this.threshold,
     });
     document
       .querySelectorAll(this.selector)
-      .forEach((el) => this.observer?.observe(el));
-  }
-
-  /** 断开观测，避免持有已卸载节点导致泄漏。 */
-  teardown(): void {
-    this.observer?.disconnect();
-    this.observer = undefined;
+      .forEach((el) => observer.observe(el));
+    // 断开观测，避免持有已卸载节点导致泄漏
+    this.onCleanup(() => observer.disconnect());
   }
 
   private readonly onIntersect = (
@@ -64,13 +57,12 @@ export class ExposureIntegration implements Integration {
       if (this.seen.has(el)) continue; // 只报首次曝光
       this.seen.add(el);
 
-      const payload: ExposurePayload = {
+      this.emit<ExposurePayload>("behavior", {
         action: "exposure",
         tagName: el.tagName,
         xpath: getXPath(el),
         ratio: entry.intersectionRatio,
-      };
-      this.client?.capture(createEvent("behavior", payload));
+      });
     }
   };
 }

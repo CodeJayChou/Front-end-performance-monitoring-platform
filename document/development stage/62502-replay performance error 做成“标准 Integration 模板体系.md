@@ -1,3 +1,18 @@
+> ⛔ **已作废（2026-06-25），不采纳，请勿照此实现。**
+>
+> 评估结论：本文「意图」正确（想给 replay/performance/error 一套标准写法），但「具体设计」与已锁定的 `ARCHITECTURE.md` 契约多处冲突：
+> 1. 事件带 `category` 等平级字段、手写事件字面量 —— 违反 §2「业务数据只放 payload，用 `createEvent` 构造」；正解放 `payload.category` 或用 `type` 的 `(string&{})` 子类型。
+> 2. 新增 `IntegrationContext`(ctx) 夹层 + `EventBus` bus —— 违反 §0/§5「不加新层」、§5.4「共享状态下沉 Hub/Scope/util，不开新总线」。
+> 3. 改写稳定 `Integration` 接口（`setup(ctx,config)/start/stop/dependencies`）—— 现有 `{setup(client), beforeSend?, teardown?}` 已稳定，零收益的破坏性重写。
+> 4. 模板无 `teardown`、无 SSR 守卫 —— 违反 §7（必须安全降级 + 还原副作用），replay 的 interval/监听会泄漏。
+> 5. `enrich`/`dispatch` 等概念已废（见 `deprecated.md`）。
+>
+> **真正的「标准模板」早已存在**：`sdk-web/.../behavior/Click.ts`、`error/GlobalError.ts` 就是范本。缺的不是模板体系，而是照此把空壳域补上 —— 首个样板 `PerformanceIntegration` 已落地（`sdk-web/src/integrations/performance/Performance.ts` + `event-contract` 的 `PerformanceEvent` 契约）。
+>
+> ——以下为原始提案，仅作历史留存。
+
+---
+
 1. 设计核心原则（必须先统一）
 
 在你这个监控体系里：

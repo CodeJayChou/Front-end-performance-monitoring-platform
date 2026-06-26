@@ -1,25 +1,19 @@
-import type { Client, Integration } from "@monitor/sdk-core";
-import { createEvent } from "@monitor/event-contract";
+import { BaseIntegration } from "@monitor/sdk-core";
 
 /**
  * 包裹 window.fetch，采集 HTTP 请求耗时与结果（性能 + API 监控）。
  * 仅采集原始信号交给 Core，不做 normalize / sampling。
  */
-export class FetchIntegration implements Integration {
+export class FetchIntegration extends BaseIntegration {
   name = "Fetch";
 
-  private client?: Client;
-  private originalFetch?: typeof window.fetch;
+  /** 需要运行时存在可用的 fetch。 */
+  protected isSupported(): boolean {
+    return typeof window !== "undefined" && typeof window.fetch === "function";
+  }
 
-  setup(client: Client): void {
-    // 非浏览器环境，或运行时无 fetch 时安全降级
-    if (typeof window === "undefined" || typeof window.fetch !== "function") {
-      return;
-    }
-
-    this.client = client;
-    this.originalFetch = window.fetch;
-    const originalFetch = this.originalFetch;
+  protected install(): void {
+    const originalFetch = window.fetch;
     const capture = this.capture.bind(this);
 
     window.fetch = function patchedFetch(
@@ -54,17 +48,14 @@ export class FetchIntegration implements Integration {
         },
       );
     };
-  }
-
-  /** 还原被包裹的 fetch，避免重复打补丁。 */
-  teardown(): void {
-    if (typeof window === "undefined" || !this.originalFetch) return;
-    window.fetch = this.originalFetch;
-    this.originalFetch = undefined;
+    // 还原被包裹的 fetch，避免重复打补丁
+    this.onCleanup(() => {
+      window.fetch = originalFetch;
+    });
   }
 
   private capture(type: string, payload: Record<string, unknown>): void {
-    this.client?.capture(createEvent(type, payload));
+    this.emit(type, payload);
   }
 }
 
