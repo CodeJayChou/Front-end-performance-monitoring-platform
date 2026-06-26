@@ -1,4 +1,5 @@
 import type { BaseEvent } from "./BaseEvent";
+import type { StackFrame } from "./StackFrame";
 
 /**
  * 错误事件载荷契约 —— 各类错误信号（JS 运行时 / 资源加载 / Promise 拒绝）的统一形状。
@@ -32,8 +33,10 @@ export interface JsErrorPayload {
   lineno?: number;
   /** 列号 */
   colno?: number;
-  /** 调用栈（若可得） */
+  /** 调用栈原始字符串（若可得） */
   stack?: string;
+  /** 归一后的结构化栈帧；由 STRUCTURAL 阶段的 stack-normalize 中间件回填 */
+  stackFrames?: StackFrame[];
 }
 
 /** 资源加载错误对应的资源种类（按可观测性归一，避免逐 tagName 发散）。 */
@@ -67,6 +70,8 @@ export interface PromiseRejectionPayload {
   reason: string;
   /** reject 值若为 Error，保留其调用栈 */
   stack?: string;
+  /** 归一后的结构化栈帧；由 STRUCTURAL 阶段的 stack-normalize 中间件回填 */
+  stackFrames?: StackFrame[];
 }
 
 /** 错误载荷联合体，由 `kind` 判别。 */
@@ -77,3 +82,30 @@ export type ErrorPayload =
 
 /** 完整错误事件：固定 `type:"error"`，payload 为错误载荷联合体。 */
 export type ErrorEvent = BaseEvent<ErrorPayload> & { type: "error" };
+
+/**
+ * 错误 payload 守卫 —— 进入 POLICY 阶段时按 `kind` 校验关键字段是否成形。
+ *
+ * 与 `validateEvent`（只查顶层 type/payload 结构）正交：这里查的是「错误语义
+ * 是否可用于聚合/去重」。adapter 输出畸形载荷（如 message 丢失、url 为空）时
+ * 直接拦在管线里，避免脏指纹污染 dedup / 后端聚合。
+ *
+ * 对开放 `kind`（平台自定义种类）只要求带非空 kind 即放行——校验责任交回贡献该
+ * 种类的平台 SDK，契约层不替未知种类做强约束（与开放联合的设计一致）。
+ */
+export function isValidErrorPayload(payload: unknown): payload is ErrorPayload {
+  if (!payload || typeof payload !== "object") return false;
+  const p = payload as Record<string, unknown>;
+  if (typeof p.kind !== "string" || p.kind.length === 0) return false;
+
+  switch (p.kind) {
+    case "js":
+      return typeof p.message === "string" && p.message.length > 0;
+    case "resource":
+      return typeof p.url === "string" && typeof p.resourceType === "string";
+    case "promise":
+      return typeof p.reason === "string";
+    default:
+      return true; // 开放 kind：带 kind 即放行，交由贡献方负责
+  }
+}

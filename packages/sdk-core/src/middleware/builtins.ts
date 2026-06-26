@@ -13,7 +13,10 @@ import { sample } from "./sampling";
  */
 export const BUILTIN_PRIORITY = {
   normalize: 100,
+  stackNormalize: 90,
   filter: 80,
+  dedup: 76,
+  rateLimit: 74,
   sample: 70,
 } as const;
 

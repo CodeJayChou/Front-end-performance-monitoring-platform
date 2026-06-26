@@ -13,6 +13,12 @@ import {
   createFilterMiddleware,
   createSampleMiddleware,
 } from "../middleware/builtins";
+import { createDedupMiddleware } from "../middleware/dedup";
+import type { DedupOptions } from "../middleware/dedup";
+import { createRateLimitMiddleware } from "../middleware/rateLimit";
+import type { RateLimitOptions } from "../middleware/rateLimit";
+import { createStackNormalizeMiddleware } from "../middleware/stackNormalize";
+import type { StackParser } from "../middleware/stackNormalize";
 import type { RuntimePlatform } from "../platform/RuntimePlatform";
 import { webPlatform } from "../platform/RuntimePlatform";
 
@@ -30,6 +36,12 @@ export interface ClientConfig {
   debug?: boolean;
   /** 平台适配口（now / uuid / global）；默认 webPlatform（globalThis 兜底）。 */
   runtime?: RuntimePlatform;
+  /** 跨端栈解析器（STRUCTURAL）。提供后把错误 payload 的 stack 解析为 stackFrames。 */
+  stackParser?: StackParser;
+  /** 去重（POLICY）。默认开启（仅错误事件、5s 窗口）；传 false 关闭。 */
+  dedup?: DedupOptions | false;
+  /** 限流（POLICY）。默认开启（全局令牌桶 100/50）；传 false 关闭。 */
+  rateLimit?: RateLimitOptions | false;
 }
 
 /**
@@ -76,13 +88,30 @@ export class Client {
         : undefined,
     );
 
-    // 默认 pipeline：STRUCTURAL(normalize) → CONTEXTUAL(context) → POLICY(filter, sample)。
-    // 阶段序由 MiddlewareType 保证，注册顺序不影响最终执行顺序。
+    // 默认 pipeline：STRUCTURAL(normalize) → CONTEXTUAL(context)
+    //   → POLICY(filter → dedup → rateLimit → sample)。
+    // 阶段序由 MiddlewareType 保证，POLICY 组内由 priority 降序排定先后；
+    // 注册顺序不影响最终执行顺序。
     this.pipeline
       .use(createNormalizeMiddleware(this.platform, this.runtime))
       .use(createContextMiddleware(this.runtime))
       .use(createFilterMiddleware())
       .use(createSampleMiddleware(config.sampleRate ?? 1));
+
+    // 栈归一（STRUCTURAL）：仅在注入了平台解析器时启用。
+    if (config.stackParser) {
+      this.pipeline.use(createStackNormalizeMiddleware(config.stackParser));
+    }
+
+    // dedup / rateLimit 默认开启，传 false 显式关闭。
+    if (config.dedup !== false) {
+      this.pipeline.use(createDedupMiddleware(config.dedup ?? {}, this.runtime));
+    }
+    if (config.rateLimit !== false) {
+      this.pipeline.use(
+        createRateLimitMiddleware(config.rateLimit ?? {}, this.runtime),
+      );
+    }
   }
 
   /** 来源端标识，供插件创建事件时使用。 */

@@ -25,6 +25,8 @@ export type {
   ErrorPayload,
   ErrorEvent,
 } from "./event/ErrorEvent";
+export { isValidErrorPayload } from "./event/ErrorEvent";
+export type { StackFrame } from "./event/StackFrame";
 export type { EventRuntime } from "./runtime";
 export { defaultRuntime } from "./runtime";
 export { Span } from "./trace/Span";

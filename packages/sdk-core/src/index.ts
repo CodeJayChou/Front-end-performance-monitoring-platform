@@ -5,6 +5,9 @@ import type { Transport } from "./transport/Transport";
 import { HttpTransport } from "./transport/HttpTransport";
 import type { RuntimePlatform } from "./platform/RuntimePlatform";
 import { webPlatform } from "./platform/RuntimePlatform";
+import type { DedupOptions } from "./middleware/dedup";
+import type { RateLimitOptions } from "./middleware/rateLimit";
+import type { StackParser } from "./middleware/stackNormalize";
 
 export interface SDKOptions {
   /** 上报地址；提供后默认走 HttpTransport（fetch + keepalive）上报到该地址 */
@@ -23,6 +26,12 @@ export interface SDKOptions {
   debug?: boolean;
   /** 平台适配口（now / uuid / global）；默认 webPlatform，跨端时由各端注入 */
   runtime?: RuntimePlatform;
+  /** 跨端栈解析器；提供后把错误 stack 解析为结构化 stackFrames（web 由 sdk-web 默认注入） */
+  stackParser?: StackParser;
+  /** 去重配置；默认开启（仅错误事件、5s 窗口），传 false 关闭 */
+  dedup?: DedupOptions | false;
+  /** 限流配置；默认开启（全局令牌桶 100/50），传 false 关闭 */
+  rateLimit?: RateLimitOptions | false;
 }
 
 /**
@@ -47,6 +56,9 @@ export function init(options: SDKOptions = {}): Client {
     beforeSend: options.beforeSend,
     debug: options.debug,
     runtime,
+    stackParser: options.stackParser,
+    dedup: options.dedup,
+    rateLimit: options.rateLimit,
   });
 
   // 1. 注册 integrations
@@ -99,6 +111,17 @@ export {
 export { normalize } from "./middleware/normalize";
 export { filter } from "./middleware/filter";
 export { sample } from "./middleware/sampling";
+export {
+  createDedupMiddleware,
+  fingerprint,
+  TtlDedupStore,
+} from "./middleware/dedup";
+export type { DedupOptions, DedupStore } from "./middleware/dedup";
+export { createRateLimitMiddleware, TokenBucket } from "./middleware/rateLimit";
+export type { RateLimitOptions } from "./middleware/rateLimit";
+export { createStackNormalizeMiddleware } from "./middleware/stackNormalize";
+export type { StackParser } from "./middleware/stackNormalize";
+export { fnv1a } from "./util/hash";
 
 /* ── Platform Adapter（运行时适配口：now / uuid / global）──── */
 export type {

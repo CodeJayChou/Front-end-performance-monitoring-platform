@@ -1,4 +1,5 @@
 import { init, type SDKOptions } from "@monitor/sdk-core";
+import { parseWebStack } from "./stack/parseWebStack";
 import { GlobalErrorIntegration } from "./integrations/error/GlobalError";
 import { PromiseRejectionIntegration } from "./integrations/error/PromiseRejection";
 import { ResourceErrorIntegration } from "./integrations/error/ResourceError";
@@ -20,6 +21,8 @@ export function initWebSDK(options: SDKOptions = {}) {
   return init({
     platform: "web",
     ...options,
+    // 默认注入 Web 栈解析器（置于 spread 之后，用户可通过 options.stackParser 覆盖）
+    stackParser: options.stackParser ?? parseWebStack,
     integrations: [
       new GlobalErrorIntegration(),
       new PromiseRejectionIntegration(),
@@ -52,6 +55,7 @@ export {
   type ExposureOptions,
 } from "./integrations/behavior/Exposure";
 export { getXPath, getText } from "./integrations/behavior/dom";
+export { parseWebStack } from "./stack/parseWebStack";
 export { FPIntegration } from "./integrations/performance/FP";
 export { FCPIntegration } from "./integrations/performance/FCP";
 export { LCPIntegration } from "./integrations/performance/LCP";

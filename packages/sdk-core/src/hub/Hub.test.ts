@@ -9,7 +9,7 @@ const makeEvent = (overrides: Partial<BaseEvent> = {}): BaseEvent => ({
   timestamp: 0,
   platform: "web",
   context: {},
-  payload: null,
+  payload: { kind: "js", message: "test" },
   ...overrides,
 });
 
