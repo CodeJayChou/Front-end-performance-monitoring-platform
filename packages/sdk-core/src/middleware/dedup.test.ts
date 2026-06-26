@@ -75,7 +75,7 @@ describe("createDedupMiddleware", () => {
   });
 
   it("默认只对 error 去重，其它类型直接放行", async () => {
-    let now = 0;
+    const now = 0;
     const mw = createDedupMiddleware({}, clockRuntime(() => now));
     const behavior = makeError({ type: "behavior", payload: { action: "click" } });
 
