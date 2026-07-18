@@ -11,6 +11,10 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
-    "@monitor/event-contract": "workspace:*"
+    "@monitor/event-contract": "workspace:*",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10"
   }
 }

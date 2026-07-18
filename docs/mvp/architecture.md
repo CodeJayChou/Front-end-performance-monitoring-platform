@@ -1,36 +1,44 @@
 # MVP Architecture
 
-## Scope
-
-The first vertical slice is deliberately small:
+## End-to-end flow
 
 ```text
-demo-web → sdk-web → BatchHttpTransport → ingest-gateway → PostgreSQL
+demo-web → sdk-web → BatchHttpTransport → ingest-gateway → events
+                                                           ↓
+                                                   processor-worker
+                                                   ├─ error_groups
+                                                   └─ metric_buckets_1m
+                                                           ↓
+                                                    query-service
 ```
-
-Kafka, ClickHouse, Replay, alerts, React/Vue adapters and RBAC are deferred until this path is stable.
 
 ## SDK flow
 
 ```text
-Integration → Client.capture → validate → Scope/Trace
+Integration → Client.capture → validation → Scope/Trace
             → normalize → context → privacy
-            → filter → stable sample → dedup → rateLimit
+            → filter → stable sampling → deduplication → rate limiting
             → beforeSend → BatchHttpTransport
 ```
 
-`BatchHttpTransport` captures the unpatched fetch function before Web integrations are installed. The configured DSN is therefore not observed by `FetchIntegration`, preventing recursive self-monitoring.
+The transport captures the original fetch function before Web integrations patch it. The SDK endpoint is also added to Fetch/XHR ignore lists, preventing recursive self-monitoring.
 
 ## Ingest flow
 
-```text
-POST /api/v1/events/batch
-  → request/batch limits
-  → project + public SDK key lookup
-  → origin allowlist
-  → schema and per-event validation
-  → transactional idempotent insert
-  → 202 Accepted
-```
+`POST /api/v1/events/batch` performs request limits, project/public SDK Key authorization, Origin allowlisting, Event Contract v1 validation and transactional idempotent inserts. The public SDK Key grants write-only ingest access.
 
-The public SDK key identifies an ingest project; it is not an administrative secret.
+## Processing flow
+
+The processor claims pending or stale events with `FOR UPDATE SKIP LOCKED`. This allows multiple worker instances without a separate queue. Each event is completed in its own transaction:
+
+- error events receive a SHA-256 fingerprint based on kind, normalized title and culprit;
+- Web Vitals are aggregated into one-minute rating buckets;
+- the aggregate update and `processed` state are committed atomically;
+- failures return to `pending` until the configured maximum attempt count, then become `failed`;
+- stale `processing` events are reclaimed after a timeout.
+
+PostgreSQL remains the MVP queue and analytics store. Kafka or ClickHouse should only be introduced after measured volume or query latency requires them.
+
+## Query and trust boundaries
+
+The query service uses a project-scoped administrative Bearer Key. It never accepts the public SDK Key. All repository queries require `project_id` and support bounded time ranges. Default range is 24 hours; maximum range is 31 days.

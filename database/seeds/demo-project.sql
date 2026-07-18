@@ -10,3 +10,9 @@ VALUES ('demo-project', 'demo-public-key', 'active')
 ON CONFLICT (public_key) DO UPDATE SET
   project_id = EXCLUDED.project_id,
   status = EXCLUDED.status;
+
+INSERT INTO project_admin_keys (project_id, admin_key, status)
+VALUES ('demo-project', 'demo-admin-key', 'active')
+ON CONFLICT (admin_key) DO UPDATE SET
+  project_id = EXCLUDED.project_id,
+  status = EXCLUDED.status;

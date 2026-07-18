@@ -13,9 +13,70 @@ services:
       - monitor_mvp_postgres:/var/lib/postgresql/data
       - ../../database/migrations/001_projects.sql:/docker-entrypoint-initdb.d/001_projects.sql:ro
       - ../../database/migrations/002_events.sql:/docker-entrypoint-initdb.d/002_events.sql:ro
-      - ../../database/seeds/demo-project.sql:/docker-entrypoint-initdb.d/003_demo-project.sql:ro
+      - ../../database/migrations/003_processing_and_query.sql:/docker-entrypoint-initdb.d/003_processing_and_query.sql:ro
+      - ../../database/seeds/demo-project.sql:/docker-entrypoint-initdb.d/004_demo-project.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U monitor -d monitor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.mvp
+    environment:
+      DATABASE_URL: postgres://monitor:monitor@postgres:5432/monitor
+      APPLY_DEMO_SEED: "true"
+    command: ["pnpm", "--filter", "@monitor/ingest-gateway", "db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ingest-gateway:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.mvp
+    environment:
+      DATABASE_URL: postgres://monitor:monitor@postgres:5432/monitor
+      PORT: "3001"
+    ports:
+      - "3001:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  processor-worker:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.mvp
+    command: ["pnpm", "--filter", "@monitor/processor-worker", "start"]
+    environment:
+      DATABASE_URL: postgres://monitor:monitor@postgres:5432/monitor
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  query-service:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.mvp
+    command: ["pnpm", "--filter", "@monitor/query-service", "start"]
+    environment:
+      DATABASE_URL: postgres://monitor:monitor@postgres:5432/monitor
+      PORT: "3002"
+    ports:
+      - "3002:3002"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3002/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 5s
       retries: 10

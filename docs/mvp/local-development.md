@@ -10,35 +10,62 @@ pnpm test
 pnpm build
 ```
 
-## 2. Start PostgreSQL
+## 2. Start the complete stack
 
 ```bash
-pnpm mvp:db:up
+pnpm mvp:up
 ```
 
-The Compose file applies the MVP migrations and creates:
+Compose starts PostgreSQL, applies all migrations, loads the demo seed, then starts the ingest gateway, processor and query service.
+
+Demo credentials:
 
 - project: `demo-project`
-- public SDK key: `demo-public-key`
-- allowed origin: `http://localhost:5173`
+- public ingest key: `demo-public-key`
+- administrative query key: `demo-admin-key`
+- allowed browser Origin: `http://localhost:5173`
 
-## 3. Start services
+Service endpoints:
+
+- ingest health: `GET http://localhost:3001/health`
+- ingest readiness: `GET http://localhost:3001/ready`
+- event ingest: `POST http://localhost:3001/api/v1/events/batch`
+- query health: `GET http://localhost:3002/health`
+- query readiness: `GET http://localhost:3002/ready`
+
+Start the browser demo separately:
 
 ```bash
-pnpm --filter @monitor/ingest-gateway dev
 pnpm --filter @monitor/demo-web dev:browser
 ```
 
-Gateway endpoints:
-
-- `GET http://localhost:3001/health`
-- `GET http://localhost:3001/ready`
-- `POST http://localhost:3001/api/v1/events/batch`
-
-## 4. Stop database
+## 3. Database-only workflow
 
 ```bash
-pnpm mvp:db:down
+pnpm mvp:db:up
+pnpm --filter @monitor/ingest-gateway db:migrate
+pnpm --filter @monitor/ingest-gateway dev
+pnpm --filter @monitor/processor-worker dev
+pnpm --filter @monitor/query-service dev
 ```
 
-Removing the named PostgreSQL volume is intentionally not part of the default command because it destroys local event data.
+To execute the real PostgreSQL integration test against that database:
+
+```bash
+TEST_DATABASE_URL=postgres://monitor:monitor@localhost:5432/monitor pnpm test:mvp:integration
+```
+
+PowerShell:
+
+```powershell
+$env:TEST_DATABASE_URL = "postgres://monitor:monitor@localhost:5432/monitor"
+pnpm test:mvp:integration
+```
+
+## 4. Stop services
+
+```bash
+pnpm mvp:down
+```
+
+The default down command preserves the named PostgreSQL volume. Removing the volume is intentionally not automated because it destroys local monitoring data.

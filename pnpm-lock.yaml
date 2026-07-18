@@ -14,9 +14,15 @@ importers:
       '@types/node':
         specifier: ^22.10.5
         version: 22.20.0
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
       eslint:
         specifier: ^9.17.0
         version: 9.39.4
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
       rimraf:
         specifier: ^6.0.1
         version: 6.1.3
@@ -80,8 +86,29 @@ importers:
       '@monitor/event-contract':
         specifier: workspace:*
         version: link:../../packages/event-contract
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
 
-  apps/query-service: {}
+  apps/query-service:
+    dependencies:
+      '@fastify/cors':
+        specifier: ^10.0.2
+        version: 10.1.0
+      fastify:
+        specifier: ^5.2.1
+        version: 5.10.0
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
 
   apps/replay-worker: {}
 

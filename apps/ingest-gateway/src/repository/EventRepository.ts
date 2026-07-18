@@ -29,8 +29,8 @@ async function insertOne(client: PoolClient, event: ValidatedEvent) {
   return client.query(
     `INSERT INTO events (
        project_id, event_id, schema_version, type, event_timestamp,
-       session_id, environment, release, trace, context, payload
-     ) VALUES ($1, $2, $3, $4, to_timestamp($5 / 1000.0), $6, $7, $8, $9, $10, $11)
+       session_id, environment, release, platform, sdk, trace, context, payload
+     ) VALUES ($1, $2, $3, $4, to_timestamp($5 / 1000.0), $6, $7, $8, $9, $10, $11, $12, $13)
      ON CONFLICT (project_id, event_id) DO NOTHING`,
     [
       event.projectId,
@@ -41,6 +41,8 @@ async function insertOne(client: PoolClient, event: ValidatedEvent) {
       event.sessionId,
       event.environment ?? "development",
       event.release ?? null,
+      event.platform,
+      event.sdk ?? null,
       event.trace ?? null,
       event.context,
       event.payload,
