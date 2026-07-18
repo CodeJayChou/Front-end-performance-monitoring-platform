@@ -7,4 +7,8 @@ import type { BaseEvent } from "@monitor/event-contract";
  */
 export interface Transport {
   send(event: BaseEvent): void | Promise<void>;
+  /** 可选的批量出口刷新钩子；Client.close 会调用。 */
+  flush?(): void | Promise<void>;
+  /** 可选的生命周期关闭钩子。 */
+  close?(): void | Promise<void>;
 }

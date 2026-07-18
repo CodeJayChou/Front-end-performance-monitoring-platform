@@ -33,6 +33,7 @@ export class HttpTransport implements Transport {
   private readonly endpoint: string;
   private readonly keepalive: boolean;
   private readonly maxRetries: number;
+  private readonly fetchFn: typeof fetch | undefined;
 
   constructor(
     options: HttpTransportOptions,
@@ -41,14 +42,21 @@ export class HttpTransport implements Transport {
     this.endpoint = options.endpoint;
     this.keepalive = options.keepalive ?? true;
     this.maxRetries = options.maxRetries ?? 2;
+    // Capture before integrations patch global fetch; this also prevents self-instrumentation.
+    this.fetchFn = runtime.global.fetch;
   }
 
   async send(event: BaseEvent): Promise<void> {
     const g = this.runtime.global;
-    const body = JSON.stringify(event);
+    let body: string;
+    try {
+      body = JSON.stringify(event);
+    } catch {
+      return;
+    }
 
-    if (typeof g.fetch === "function") {
-      await this.sendWithFetch(g.fetch, body);
+    if (this.fetchFn) {
+      await this.sendWithFetch(this.fetchFn, body);
       return;
     }
 
@@ -63,18 +71,26 @@ export class HttpTransport implements Transport {
   ): Promise<void> {
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
-        await fetchFn(this.endpoint, {
+        const response = await fetchFn(this.endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body,
           keepalive: this.keepalive,
         });
-        return; // 成功即结束
+        if (response.ok || (response.status >= 200 && response.status < 300)) return;
+        if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) return;
+        if (attempt === this.maxRetries) {
+          this.runtime.global.navigator?.sendBeacon?.(this.endpoint, body);
+          return;
+        }
       } catch {
         // 最后一次仍失败：尝试 sendBeacon 兜底，仍失败则放弃（不抛错）。
         if (attempt === this.maxRetries) {
           this.runtime.global.navigator?.sendBeacon?.(this.endpoint, body);
         }
+      }
+      if (attempt < this.maxRetries) {
+        await new Promise<void>((resolve) => setTimeout(resolve, Math.min(2_000, 100 * 2 ** attempt)));
       }
     }
   }

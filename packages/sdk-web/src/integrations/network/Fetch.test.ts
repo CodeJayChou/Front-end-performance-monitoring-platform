@@ -70,6 +70,17 @@ describe("FetchIntegration", () => {
     expect(globalRef.window.fetch).toBe(original);
   });
 
+  it("ignoreUrls 命中的 SDK 内部请求不 capture", async () => {
+    const original = vi.fn(async () => ({ status: 202, ok: true }) as Response);
+    globalRef.window = { fetch: original as unknown as typeof fetch };
+    const capture = vi.fn<(event: BaseEvent) => void>();
+    new FetchIntegration({ ignoreUrls: ["/api/v1/events/batch"] }).setup({ capture } as unknown as Client);
+
+    await globalRef.window.fetch("/api/v1/events/batch?project=demo");
+    expect(original).toHaveBeenCalledTimes(1);
+    expect(capture).not.toHaveBeenCalled();
+  });
+
   it("非浏览器环境（无 window）安全降级，不抛错", () => {
     const client = { capture: vi.fn() } as unknown as Client;
     expect(() => new FetchIntegration().setup(client)).not.toThrow();

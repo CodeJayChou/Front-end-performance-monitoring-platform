@@ -42,6 +42,11 @@ console.log = (...args: unknown[]): void => {
 
 // 一行初始化；debug 打开事件流日志
 const client = initWebSDK({
+  dsn: "http://localhost:3001/api/v1/events/batch",
+  projectId: "demo-project",
+  sdkKey: "demo-public-key",
+  environment: "development",
+  release: "demo-web@0.1.0",
   debug: true,
   sampleRate: 1,
   beforeSend(event) {

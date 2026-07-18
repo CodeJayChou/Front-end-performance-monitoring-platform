@@ -3,15 +3,29 @@ import type { BeforeSend } from "./client/Client";
 import type { Integration } from "./integration/Integration";
 import type { Transport } from "./transport/Transport";
 import { HttpTransport } from "./transport/HttpTransport";
+import { BatchHttpTransport } from "./transport/BatchHttpTransport";
 import type { RuntimePlatform } from "./platform/RuntimePlatform";
 import { webPlatform } from "./platform/RuntimePlatform";
 import type { DedupOptions } from "./middleware/dedup";
 import type { RateLimitOptions } from "./middleware/rateLimit";
 import type { StackParser } from "./middleware/stackNormalize";
+import type { PrivacyOptions } from "./middleware/privacy";
 
 export interface SDKOptions {
   /** 上报地址；提供后默认走 HttpTransport（fetch + keepalive）上报到该地址 */
   dsn?: string;
+  /** MVP 项目标识与公开接入 key；两者同时存在时启用批量 HTTP 出口。 */
+  projectId?: string;
+  sdkKey?: string;
+  /** 平台 SDK 身份；平台入口通常会自动设置。 */
+  sdk?: { name: string; version: string };
+  /** 运行环境与发布版本。 */
+  environment?: string;
+  release?: string;
+  /** 默认开启的隐私清洗配置。 */
+  privacy?: PrivacyOptions;
+  /** 固定会话标识；不提供时 Client 为当前实例生成。 */
+  sessionId?: string;
   /** 来源端标识，默认 "web" */
   platform?: string;
   /** 全局采样率（0~1），默认 1 全量上报 */
@@ -43,14 +57,28 @@ export function init(options: SDKOptions = {}): Client {
   const runtime = options.runtime ?? webPlatform;
 
   // 出口选择：显式 transport 优先；否则有 dsn 走 HttpTransport（共享同一 runtime），最后回落 ConsoleTransport（Client 内部默认）。
-  const transport =
-    options.transport ??
-    (options.dsn
-      ? new HttpTransport({ endpoint: options.dsn }, runtime)
-      : undefined);
+  const transport = options.transport ??
+    (options.dsn && options.projectId && options.sdkKey
+      ? new BatchHttpTransport(
+          {
+            endpoint: options.dsn,
+            projectId: options.projectId,
+            sdkKey: options.sdkKey,
+          },
+          runtime,
+        )
+      : options.dsn
+        ? new HttpTransport({ endpoint: options.dsn }, runtime)
+        : undefined);
 
   const client = new Client({
     platform: options.platform || "web",
+    projectId: options.projectId,
+    environment: options.environment,
+    release: options.release,
+    privacy: options.privacy,
+    sessionId: options.sessionId,
+    sdk: options.sdk ?? { name: "@monitor/sdk-core", version: "0.0.0" },
     sampleRate: options.sampleRate,
     transport,
     beforeSend: options.beforeSend,
@@ -94,6 +122,8 @@ export type { Transport } from "./transport/Transport";
 export type { HttpTransportOptions } from "./transport/HttpTransport";
 export { ConsoleTransport } from "./transport/ConsoleTransport";
 export { HttpTransport } from "./transport/HttpTransport";
+export type { BatchHttpTransportOptions } from "./transport/BatchHttpTransport";
+export { BatchHttpTransport } from "./transport/BatchHttpTransport";
 
 /* ── Middleware（事件管道）──────────────────────────── */
 export { MiddlewarePipeline, MiddlewareType } from "./middleware/MiddlewarePipeline";
@@ -121,6 +151,8 @@ export { createRateLimitMiddleware, TokenBucket } from "./middleware/rateLimit";
 export type { RateLimitOptions } from "./middleware/rateLimit";
 export { createStackNormalizeMiddleware } from "./middleware/stackNormalize";
 export type { StackParser } from "./middleware/stackNormalize";
+export { createPrivacyMiddleware, sanitizeEvent, sanitizeUrl } from "./middleware/privacy";
+export type { PrivacyOptions } from "./middleware/privacy";
 export { fnv1a } from "./util/hash";
 
 /* ── Platform Adapter（运行时适配口：now / uuid / global）──── */

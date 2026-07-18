@@ -30,5 +30,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Smoke run demo-app
-        run: pnpm --filter @monitor/demo-app dev
+      - name: Test
+        run: pnpm test
+
+      - name: Smoke build demo-web
+        run: pnpm --filter @monitor/demo-web build

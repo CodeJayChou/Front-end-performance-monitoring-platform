@@ -19,6 +19,8 @@ import { createRateLimitMiddleware } from "../middleware/rateLimit";
 import type { RateLimitOptions } from "../middleware/rateLimit";
 import { createStackNormalizeMiddleware } from "../middleware/stackNormalize";
 import type { StackParser } from "../middleware/stackNormalize";
+import { createPrivacyMiddleware } from "../middleware/privacy";
+import type { PrivacyOptions } from "../middleware/privacy";
 import type { RuntimePlatform } from "../platform/RuntimePlatform";
 import { webPlatform } from "../platform/RuntimePlatform";
 
@@ -27,6 +29,16 @@ export type BeforeSend = (event: BaseEvent) => BaseEvent | null;
 
 export interface ClientConfig {
   platform: string;
+  /** MVP 项目边界；未配置时使用 local-dev，便于本地 console transport。 */
+  projectId?: string;
+  /** SDK 身份信息，默认由包自身提供。 */
+  sdk?: { name: string; version: string };
+  /** 运行环境和发布版本。 */
+  environment?: string;
+  release?: string;
+  privacy?: PrivacyOptions;
+  /** 可注入固定 session，未提供时由 Client 为当前实例生成。 */
+  sessionId?: string;
   /** 全局采样率（0~1），默认 1 全量上报。 */
   sampleRate?: number;
   /** 事件出口，默认 ConsoleTransport。 */
@@ -72,9 +84,11 @@ export class Client {
   private readonly transport: Transport;
   private readonly beforeSend?: BeforeSend;
   private readonly debug: boolean;
+  private readonly sessionId: string;
 
   constructor(private readonly config: ClientConfig) {
     this.runtime = config.runtime ?? webPlatform;
+    this.sessionId = config.sessionId ?? this.runtime.uuid();
     this.transport = config.transport ?? new ConsoleTransport();
     this.beforeSend = config.beforeSend;
     this.debug = config.debug ?? false;
@@ -89,14 +103,24 @@ export class Client {
     );
 
     // 默认 pipeline：STRUCTURAL(normalize) → CONTEXTUAL(context)
-    //   → POLICY(filter → dedup → rateLimit → sample)。
+    //   → POLICY(filter → sample → dedup → rateLimit)。
     // 阶段序由 MiddlewareType 保证，POLICY 组内由 priority 降序排定先后；
     // 注册顺序不影响最终执行顺序。
     this.pipeline
-      .use(createNormalizeMiddleware(this.platform, this.runtime))
+      .use(
+        createNormalizeMiddleware(this.platform, this.runtime, {
+          schemaVersion: "1.0",
+          projectId: config.projectId ?? "local-dev",
+          sessionId: this.sessionId,
+          sdk: config.sdk ?? { name: "@monitor/sdk-core", version: "0.0.0" },
+          environment: config.environment ?? "development",
+          release: config.release,
+        }),
+      )
       .use(createContextMiddleware(this.runtime))
+      .use(createPrivacyMiddleware(config.privacy))
       .use(createFilterMiddleware())
-      .use(createSampleMiddleware(config.sampleRate ?? 1));
+      .use(createSampleMiddleware(config.sampleRate ?? 1, this.sessionId));
 
     // 栈归一（STRUCTURAL）：仅在注入了平台解析器时启用。
     if (config.stackParser) {
@@ -127,6 +151,11 @@ export class Client {
   /** 平台适配口（now / uuid / global）；hub / integration 等应复用它，而非直接摸全局。 */
   getRuntime(): RuntimePlatform {
     return this.runtime;
+  }
+
+  /** 当前 Client 的会话标识；Web SDK 可在初始化时注入持久化 session。 */
+  getSessionId(): string {
+    return this.sessionId;
   }
 
   /** 当前作用域（栈顶）。业务侧 setUser / setTag / addBreadcrumb 的入口。 */
@@ -166,6 +195,17 @@ export class Client {
    */
   close(): void {
     this.integrations.forEach((integration) => integration.teardown?.());
+    const closing = this.transport.close?.();
+    if (closing instanceof Promise) {
+      void closing.catch((error: unknown) => {
+        if (this.debug) console.warn("[SDK INTERNAL ERROR] transport close failed", error);
+      });
+    }
+  }
+
+  /** 立即刷新批量出口；测试、页面隐藏和显式提交场景可使用。 */
+  async flush(): Promise<void> {
+    await this.transport.flush?.();
   }
 
   /**
@@ -173,31 +213,36 @@ export class Client {
    * middleware → beforeSend 后送出。任一环节判定丢弃即静默返回。
    */
   async capture(event: BaseEvent): Promise<void> {
-    // 0. 结构校验：脏数据不进入链路
-    if (!validateEvent(event)) {
-      this.log("drop:invalid", event);
-      return;
+    try {
+      // 0. 结构校验：脏数据不进入链路
+      if (!validateEvent(event)) {
+        this.log("drop:invalid", event);
+        return;
+      }
+
+      // 1. integration.beforeSend：进入 pipeline 前的同步增强 / 丢弃
+      const guarded = this.runIntegrations(event);
+      if (!guarded) return;
+
+      // 2. context 单点注入：经唯一 Hub 把业务上下文（user/tags/route/breadcrumbs）+ trace 合并进事件
+      const scoped = this.hub.applyToEvent(guarded);
+      this.log("scope", scoped);
+
+      // 3. middleware pipeline：normalize → context/privacy → filter/sample/dedup/rateLimit
+      const processed = await this.pipeline.execute(scoped);
+      if (!processed) return;
+
+      // 4. beforeSend：最后一次改写 / 丢弃的机会
+      const outgoing = this.beforeSend ? this.beforeSend(processed) : processed;
+      if (!outgoing) return;
+
+      // 5. 出口
+      this.log("transport", outgoing);
+      await this.transport.send(outgoing);
+    } catch (error) {
+      // 监控 SDK 的故障不能反向影响宿主应用；debug 模式下保留诊断信息。
+      if (this.debug) console.warn("[SDK INTERNAL ERROR] capture failed", error);
     }
-
-    // 1. integration.beforeSend：进入 pipeline 前的同步增强 / 丢弃
-    const guarded = this.runIntegrations(event);
-    if (!guarded) return;
-
-    // 2. context 单点注入：经唯一 Hub 把业务上下文（user/tags/route/breadcrumbs）+ trace 合并进事件
-    const scoped = this.hub.applyToEvent(guarded);
-    this.log("scope", scoped);
-
-    // 3. middleware pipeline：normalize → context → filter → sample → 自定义层
-    const processed = await this.pipeline.execute(scoped);
-    if (!processed) return;
-
-    // 4. beforeSend：最后一次改写 / 丢弃的机会
-    const outgoing = this.beforeSend ? this.beforeSend(processed) : processed;
-    if (!outgoing) return;
-
-    // 5. 出口
-    this.log("transport", outgoing);
-    await this.transport.send(outgoing);
   }
 
   /** 依次执行插件 beforeSend；任一返回 null 即丢弃整条事件。 */

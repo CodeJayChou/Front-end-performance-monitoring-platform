@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BaseEvent } from "@monitor/event-contract";
+import { createEvent } from "@monitor/event-contract";
 import type { Transport } from "@monitor/sdk-core";
 import { initWebSDK } from "./index";
 
@@ -80,6 +81,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete globalRef.window;
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -173,5 +175,27 @@ describe("web-sdk 端到端流程完整性", () => {
     await flush();
 
     expect(sent).toHaveLength(0);
+  });
+
+  it("dsn 批量上报不会被 FetchIntegration 再次采集", async () => {
+    const originalFetch = vi.fn<typeof fetch>(async () => new Response(null, { status: 202 }));
+    vi.stubGlobal("fetch", originalFetch);
+    win.fetch = globalThis.fetch;
+
+    const client = initWebSDK({
+      dsn: "/api/v1/events/batch",
+      projectId: "demo-project",
+      sdkKey: "demo-public-key",
+    });
+    await client.capture(createEvent("custom", { ok: true }));
+    await client.flush();
+
+    expect(originalFetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String(originalFetch.mock.calls[0]![1]?.body)) as {
+      events: BaseEvent[];
+    };
+    expect(body.events).toHaveLength(1);
+    expect(body.events[0]!.type).toBe("custom");
+    client.close();
   });
 });

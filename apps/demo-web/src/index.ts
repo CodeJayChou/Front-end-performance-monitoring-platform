@@ -3,6 +3,10 @@ import { createEvent } from "@monitor/event-contract";
 
 // 最终用户视角：一行初始化，按需配置采样率 / beforeSend
 const client = initWebSDK({
+  projectId: "demo-project",
+  sdkKey: "demo-public-key",
+  environment: "development",
+  release: "demo-web@0.1.0",
   sampleRate: 1, // 全量上报
   beforeSend(event) {
     // 这里可做：过滤敏感数据 / 采样 / 返回 null 丢弃事件
@@ -23,5 +27,11 @@ const isBrowser = typeof (globalThis as { window?: unknown }).window !== "undefi
 if (isBrowser) {
   throw new Error("test error");
 } else {
-  client.capture(createEvent("error", { message: "test error" }, client.platform));
+  client.capture(
+    createEvent(
+      "error",
+      { kind: "js", message: "test error" },
+      client.platform,
+    ),
+  );
 }

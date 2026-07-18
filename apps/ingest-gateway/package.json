@@ -11,6 +11,12 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
-    "@monitor/event-contract": "workspace:*"
+    "@monitor/event-contract": "workspace:*",
+    "@fastify/cors": "^10.0.2",
+    "fastify": "^5.2.1",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10"
   }
 }

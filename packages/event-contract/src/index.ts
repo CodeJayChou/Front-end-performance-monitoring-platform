@@ -1,4 +1,9 @@
-export type { BaseEvent, TraceContext, EventType } from "./event/BaseEvent";
+export type {
+  BaseEvent,
+  TraceContext,
+  EventType,
+  CreateEventOptions,
+} from "./event/BaseEvent";
 export { createEvent, validateEvent } from "./event/BaseEvent";
 export type {
   BehaviorAction,

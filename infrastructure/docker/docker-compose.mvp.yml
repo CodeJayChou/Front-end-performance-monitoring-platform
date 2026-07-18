@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: monitor-mvp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: monitor
+      POSTGRES_PASSWORD: monitor
+      POSTGRES_DB: monitor
+    ports:
+      - "5432:5432"
+    volumes:
+      - monitor_mvp_postgres:/var/lib/postgresql/data
+      - ../../database/migrations/001_projects.sql:/docker-entrypoint-initdb.d/001_projects.sql:ro
+      - ../../database/migrations/002_events.sql:/docker-entrypoint-initdb.d/002_events.sql:ro
+      - ../../database/seeds/demo-project.sql:/docker-entrypoint-initdb.d/003_demo-project.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monitor -d monitor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  monitor_mvp_postgres:

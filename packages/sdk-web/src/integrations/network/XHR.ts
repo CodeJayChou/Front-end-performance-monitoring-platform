@@ -7,6 +7,10 @@ interface XHRMeta {
   start: number;
 }
 
+export interface XHROptions {
+  ignoreUrls?: Array<string | RegExp>;
+}
+
 /**
  * 包裹 XMLHttpRequest.open / send，采集 HTTP 请求耗时与结果（性能 + API 监控）。
  *
@@ -16,9 +20,15 @@ interface XHRMeta {
  */
 export class XHRIntegration extends BaseIntegration {
   name = "XHR";
+  private readonly ignoreUrls: Array<string | RegExp>;
 
   /** open 阶段记录 method/url，send 阶段记录起始时间，按实例隔离。 */
   private readonly meta = new WeakMap<XMLHttpRequest, XHRMeta>();
+
+  constructor(options: XHROptions = {}) {
+    super();
+    this.ignoreUrls = options.ignoreUrls ?? [];
+  }
 
   /** 需要运行时存在 XMLHttpRequest。 */
   protected isSupported(): boolean {
@@ -29,6 +39,7 @@ export class XHRIntegration extends BaseIntegration {
     const proto = XMLHttpRequest.prototype;
     const meta = this.meta;
     const emit = this.emit.bind(this);
+    const ignoreUrls = this.ignoreUrls;
 
     const originalOpen = proto.open;
     const originalSend = proto.send;
@@ -58,7 +69,7 @@ export class XHRIntegration extends BaseIntegration {
       ...args: Parameters<XMLHttpRequest["send"]>
     ): void {
       const ctx = meta.get(this);
-      if (ctx) {
+      if (ctx && !shouldIgnore(ctx.url, ignoreUrls)) {
         ctx.start = performance.now();
 
         const report = (type: string, extra: Record<string, unknown>): void => {
@@ -98,4 +109,10 @@ export class XHRIntegration extends BaseIntegration {
       proto.send = originalSend;
     });
   }
+}
+
+function shouldIgnore(url: string, rules: Array<string | RegExp>): boolean {
+  return rules.some((rule) =>
+    typeof rule === "string" ? url.startsWith(rule) : rule.test(url),
+  );
 }

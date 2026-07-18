@@ -115,6 +115,19 @@ describe("XHRIntegration", () => {
     expect(XHR.prototype.send).toBe(originalSend);
   });
 
+  it("ignoreUrls 命中的 SDK 内部请求不 capture", () => {
+    const XHR = installXHR();
+    const capture = vi.fn<(event: BaseEvent) => void>();
+    new XHRIntegration({ ignoreUrls: ["/api/v1/events/batch"] }).setup({ capture } as unknown as Client);
+
+    const xhr = new XHR();
+    xhr.open("POST", "/api/v1/events/batch");
+    xhr.send();
+    xhr.status = 202;
+    xhr.dispatch("load");
+    expect(capture).not.toHaveBeenCalled();
+  });
+
   it("非浏览器环境（无 XMLHttpRequest）安全降级，不抛错", () => {
     const client = { capture: vi.fn() } as unknown as Client;
     expect(() => new XHRIntegration().setup(client)).not.toThrow();
