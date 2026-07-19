@@ -4,7 +4,8 @@ RUN corepack enable
 WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @monitor/ingest-gateway build \
+RUN pnpm --filter @monitor/event-contract build \
+ && pnpm --filter @monitor/ingest-gateway build \
  && pnpm --filter @monitor/processor-worker build \
  && pnpm --filter @monitor/query-service build
 
