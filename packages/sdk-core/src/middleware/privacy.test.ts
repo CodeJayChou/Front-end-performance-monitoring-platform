@@ -31,4 +31,20 @@ describe("privacy middleware", () => {
     const event = createEvent("custom", { text: "visible" });
     expect(sanitizeEvent(event, { captureText: true }).payload).toEqual({ text: "visible" });
   });
+
+  it("preserves numeric metric values while removing text input values", () => {
+    const event = createEvent("performance", {
+      metric: "LCP",
+      value: 1234,
+      rating: "good",
+      form: { value: "private input" },
+    });
+
+    expect(sanitizeEvent(event).payload).toEqual({
+      metric: "LCP",
+      value: 1234,
+      rating: "good",
+      form: {},
+    });
+  });
 });

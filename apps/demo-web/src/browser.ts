@@ -116,7 +116,17 @@ on("custom", () => {
   );
 });
 
-// 7. 清空面板
+// 生成一个明显的慢交互，确保本地演示能稳定观察到 INP 变化。
+// SDK 已开启 reportAllChanges，无需切换标签页即可进入一分钟聚合桶。
+on("inp", () => {
+  const startedAt = performance.now();
+  while (performance.now() - startedAt < 120) {
+    // 演示用：有意占用主线程，模拟耗时的事件处理器。
+  }
+  console.log("[demo] → 慢交互完成，INP 将实时上报");
+});
+
+// 8. 清空面板
 on("clear", () => {
   panel.replaceChildren();
 });

@@ -33,6 +33,8 @@ The processor claims pending or stale events with `FOR UPDATE SKIP LOCKED`. This
 
 - error events receive a SHA-256 fingerprint based on kind, normalized title and culprit;
 - Web Vitals are aggregated into one-minute rating buckets;
+- INP reports live changes and, after the first interaction, emits the current
+  page-session value once per minute for long-lived-page time series;
 - the aggregate update and `processed` state are committed atomically;
 - failures return to `pending` until the configured maximum attempt count, then become `failed`;
 - stale `processing` events are reclaimed after a timeout.

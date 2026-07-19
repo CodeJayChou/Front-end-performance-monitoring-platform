@@ -39,7 +39,10 @@ export function sanitizeEvent(
   const clean = (value: unknown, key?: string, seen = new WeakSet<object>()): unknown => {
     const normalizedKey = key?.toLowerCase();
     if (normalizedKey && SENSITIVE_KEYS.has(normalizedKey)) return undefined;
-    if (!options.captureText && (normalizedKey === "text" || normalizedKey === "value")) {
+    if (
+      !options.captureText &&
+      (normalizedKey === "text" || (normalizedKey === "value" && typeof value === "string"))
+    ) {
       return undefined;
     }
     if (typeof value === "string") {

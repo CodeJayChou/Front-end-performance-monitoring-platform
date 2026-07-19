@@ -12,6 +12,7 @@ import { FPIntegration } from "./integrations/performance/FP";
 import { FCPIntegration } from "./integrations/performance/FCP";
 import { LCPIntegration } from "./integrations/performance/LCP";
 import { CLSIntegration } from "./integrations/performance/CLS";
+import { INPIntegration } from "./integrations/performance/INP";
 import { LongTaskIntegration } from "./integrations/performance/LongTask";
 import { FlushOnPageHideIntegration } from "./integrations/lifecycle/FlushOnPageHide";
 
@@ -41,6 +42,7 @@ export function initWebSDK(options: SDKOptions = {}) {
       new FCPIntegration(),
       new LCPIntegration(),
       new CLSIntegration(),
+      new INPIntegration(),
       new LongTaskIntegration(),
       new FlushOnPageHideIntegration(),
       ...(options.integrations ?? []),
@@ -86,6 +88,7 @@ export { FPIntegration } from "./integrations/performance/FP";
 export { FCPIntegration } from "./integrations/performance/FCP";
 export { LCPIntegration } from "./integrations/performance/LCP";
 export { CLSIntegration } from "./integrations/performance/CLS";
+export { INPIntegration } from "./integrations/performance/INP";
 export { LongTaskIntegration } from "./integrations/performance/LongTask";
 export { FlushOnPageHideIntegration } from "./integrations/lifecycle/FlushOnPageHide";
 export {

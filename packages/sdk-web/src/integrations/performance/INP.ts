@@ -1,12 +1,46 @@
+import { BaseIntegration } from "@monitor/sdk-core";
+import { onINP } from "web-vitals";
+import { toPerformancePayload } from "./webVitals";
+
+const SNAPSHOT_INTERVAL_MS = 60_000;
+
 /**
- * INP（Interaction to Next Paint）—— 暂未实现，刻意留空。
- *
- * 原因：INP 不是单点指标，需追踪整个会话内所有交互（pointer/keyboard/click）的
- * 处理时长，剔除离群后取近似 98 分位，并在页面隐藏时定稿。算法复杂度远高于
- * FP/FCP/LCP/CLS，草率实现会得出错误数值，反而误导。
- *
- * 落地时走标准模板：extends BaseIntegration，实现 install()，用 onCleanup 登记解绑、
- * this.emit("performance", toPerformancePayload("INP", value)) 上报（复用 webVitals.ts）。
- * 阈值已在 VITALS_THRESHOLDS.INP 备好（good 200ms / poor 500ms）。
+ * Collect Interaction to Next Paint using the reference web-vitals
+ * implementation. Report changes while the page stays open so each observed
+ * value can enter the processor's one-minute bucket. After the first user
+ * interaction, also report the current page-session INP once per minute so a
+ * long-lived page produces a continuous minute series. Page-hide still lets
+ * web-vitals report the final value.
  */
-export {};
+export class INPIntegration extends BaseIntegration {
+  name = "INP";
+
+  protected install(): void {
+    let latestValue: number | undefined;
+    let snapshotTimer: ReturnType<typeof setInterval> | undefined;
+    let active = true;
+
+    onINP(
+      (metric) => {
+        if (!active) return;
+        latestValue = metric.value;
+        this.emit("performance", toPerformancePayload("INP", metric.value));
+
+        if (snapshotTimer === undefined) {
+          snapshotTimer = setInterval(() => {
+            if (latestValue === undefined) return;
+            this.emit("performance", toPerformancePayload("INP", latestValue));
+          }, SNAPSHOT_INTERVAL_MS);
+          // Do not keep Node-based SDK tests or command-line demos alive.
+          (snapshotTimer as unknown as { unref?: () => void }).unref?.();
+        }
+      },
+      { reportAllChanges: true, durationThreshold: 0 },
+    );
+
+    this.onCleanup(() => {
+      active = false;
+      if (snapshotTimer !== undefined) clearInterval(snapshotTimer);
+    });
+  }
+}
