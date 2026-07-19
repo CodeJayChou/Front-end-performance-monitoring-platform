@@ -10,8 +10,19 @@
         font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
         margin: 0;
         padding: 24px;
-        max-width: 960px;
+        width: 100%;
+        max-width: none;
+        min-height: 100vh;
+        box-sizing: border-box;
       }
+      .demo-layout {
+        display: grid;
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 24px;
+        align-items: start;
+      }
+      .demo-main { min-width: 0; }
       h1 { font-size: 20px; }
       p.hint { color: #888; margin-top: 0; }
       .btns { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
@@ -25,42 +36,154 @@
       }
       button:hover { background: #6b8afd44; }
       #clear { background: #8881; }
+      .log-panel {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: calc(100vh - 80px);
+        min-height: 420px;
+        position: sticky;
+        top: 24px;
+        overflow: hidden;
+        border: 1px solid #263653;
+        border-radius: 12px;
+        background: #0b0f19;
+        box-shadow: 0 16px 40px #05081233;
+      }
+      .log-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex: 0 0 auto;
+        padding: 12px 16px;
+        color: #e6edf7;
+        background: #111a2a;
+        border-bottom: 1px solid #263653;
+      }
+      .log-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .log-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #20a777;
+        box-shadow: 0 0 0 4px #20a77722;
+      }
+      .log-state {
+        color: #8fa2bd;
+        font-size: 11px;
+        letter-spacing: .08em;
+      }
       #log {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0;
         background: #0b0f19;
         color: #c8d3f5;
         padding: 16px;
-        border-radius: 10px;
-        height: 420px;
         overflow: auto;
         font: 12px/1.6 ui-monospace, "Cascadia Code", monospace;
         white-space: pre-wrap;
         word-break: break-all;
+        scrollbar-width: thin;
+        scrollbar-color: #49617f #0b0f19;
       }
+      #log::-webkit-scrollbar { width: 10px; }
+      #log::-webkit-scrollbar-track { background: #0b0f19; }
+      #log::-webkit-scrollbar-thumb {
+        min-height: 36px;
+        border: 2px solid #0b0f19;
+        border-radius: 999px;
+        background: #49617f;
+      }
+      #log::-webkit-scrollbar-thumb:hover { background: #6b8fb8; }
       .stage { color: #7ee787; }
       .drop { color: #ff7b72; }
       .meta { color: #79c0ff; }
+      @media (max-width: 900px) {
+        .demo-layout { grid-template-columns: 1fr; }
+        .log-panel {
+          position: static;
+          height: 420px;
+          min-height: 0;
+        }
+      }
+      .perf-lab {
+        margin: 20px 0;
+        padding: 16px;
+        border: 1px solid #6b8afd44;
+        border-radius: 10px;
+      }
+      .perf-lab h2 { margin: 0 0 8px; font-size: 16px; }
+      .perf-lab p { color: #888; margin: 0 0 12px; font-size: 13px; }
+      .scenario-hero {
+        min-height: 130px;
+        display: grid;
+        place-items: center;
+        margin: 16px 0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #263b70, #8a4d73);
+        color: white;
+        font-size: 42px;
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
-    <h1>web-sdk 流程触发页</h1>
-    <p class="hint">
-      点击按钮触发真实浏览器信号，观察事件穿过链路：<br />
-      <code>integration → scope → middleware:* → transport</code>。<br />
-      日志同时输出到下方面板和浏览器 DevTools Console。
-    </p>
+    <div class="demo-layout">
+      <main class="demo-main">
+        <h1>web-sdk 流程触发页</h1>
+        <p class="hint">
+          点击按钮触发真实浏览器信号，观察事件穿过链路：<br />
+          <code>integration → scope → middleware:* → transport</code>。<br />
+          日志同时输出到右侧面板和浏览器 DevTools Console。
+        </p>
 
-    <div class="btns">
-      <button id="err">抛未捕获错误 (window.onerror)</button>
-      <button id="reject">未处理 Promise rejection</button>
-      <button id="fetch-ok">fetch 成功 (200)</button>
-      <button id="fetch-fail">fetch 失败 (网络错误)</button>
-      <button id="resource-err">资源加载失败 (img 404)</button>
-      <button id="custom">自定义事件 capture()</button>
-      <button id="inp">触发慢交互 (INP)</button>
-      <button id="clear">清空日志</button>
+        <div class="btns">
+          <button id="err">抛未捕获错误 (window.onerror)</button>
+          <button id="reject">未处理 Promise rejection</button>
+          <button id="fetch-ok">fetch 成功 (200)</button>
+          <button id="fetch-fail">fetch 失败 (网络错误)</button>
+          <button id="resource-err">资源加载失败 (img 404)</button>
+          <button id="custom">自定义事件 capture()</button>
+          <button id="inp">触发慢交互 (INP)</button>
+          <button id="clear">清空日志</button>
+        </div>
+
+        <section class="perf-lab" aria-labelledby="perf-lab-title">
+          <h2 id="perf-lab-title">Performance Lab：生成多样化性能样本</h2>
+          <p>INP 会实时上报；CLS 和 Long Task 在切换标签页后定稿。每次 LCP/FCP 场景都会刷新页面。</p>
+          <div class="btns">
+            <button id="inp-fast">INP 轻交互 (60ms)</button>
+            <button id="inp-medium">INP 中交互 (240ms)</button>
+            <button id="inp-slow">INP 重交互 (650ms)</button>
+            <button id="cls-small">CLS 小位移</button>
+            <button id="cls-large">CLS 大位移</button>
+            <button id="longtask">Long Task (900ms)</button>
+            <button id="lcp-fast">刷新：快速 LCP</button>
+            <button id="lcp-slow">刷新：慢 LCP</button>
+            <button id="fcp-slow">刷新：阻塞 FCP</button>
+          </div>
+        </section>
+
+        <div id="scenario-hero" class="scenario-hero" hidden></div>
+      </main>
+
+      <aside class="log-panel" aria-label="SDK 事件日志">
+        <div class="log-header">
+          <div class="log-title"><span class="log-dot" aria-hidden="true"></span>SDK 实时日志</div>
+          <span class="log-state">LIVE</span>
+        </div>
+        <div id="log"></div>
+      </aside>
     </div>
-
-    <div id="log"></div>
 
     <script type="module" src="/src/browser.ts"></script>
   </body>

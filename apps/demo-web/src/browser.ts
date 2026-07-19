@@ -10,6 +10,32 @@ import { createEvent } from "@monitor/event-contract";
 
 const panel = document.getElementById("log")!;
 
+function busyWait(durationMs: number): void {
+  const startedAt = performance.now();
+  while (performance.now() - startedAt < durationMs) {
+    // Deliberately block the main thread to create a measurable lab sample.
+  }
+}
+
+function loadRenderScenario(): void {
+  const params = new URLSearchParams(location.search);
+  const scenario = params.get("perf");
+  if (scenario === "slow-lcp") {
+    const delay = Number(params.get("delay")) || 1_500;
+    window.setTimeout(() => {
+      const hero = document.getElementById("scenario-hero");
+      if (!hero) return;
+      hero.hidden = false;
+      hero.textContent = "Delayed LCP hero";
+    }, delay);
+  }
+  if (scenario === "blocked-fcp") busyWait(1_200);
+}
+
+// Run before SDK initialization so the scenario is part of the page's real
+// paint lifecycle, rather than a synthetic performance event.
+loadRenderScenario();
+
 /** 把一行日志渲染到页面面板，并按 stage / drop 上色。 */
 function render(label: string, payload?: unknown): void {
   const line = document.createElement("div");
@@ -119,14 +145,58 @@ on("custom", () => {
 // 生成一个明显的慢交互，确保本地演示能稳定观察到 INP 变化。
 // SDK 已开启 reportAllChanges，无需切换标签页即可进入一分钟聚合桶。
 on("inp", () => {
-  const startedAt = performance.now();
-  while (performance.now() - startedAt < 120) {
-    // 演示用：有意占用主线程，模拟耗时的事件处理器。
-  }
+  busyWait(120);
   console.log("[demo] → 慢交互完成，INP 将实时上报");
 });
 
-// 8. 清空面板
+function bindInteractionSample(id: string, durationMs: number): void {
+  on(id, () => {
+    busyWait(durationMs);
+    console.log(`[perf-lab] → INP ${durationMs}ms interaction complete`);
+  });
+}
+
+bindInteractionSample("inp-fast", 60);
+bindInteractionSample("inp-medium", 240);
+bindInteractionSample("inp-slow", 650);
+
+function bindLayoutShiftSample(id: string, height: number): void {
+  on(id, () => {
+    console.log(`[perf-lab] → CLS ${height}px shift scheduled`);
+    // Delay beyond the browser's recent-input window so the shift is counted
+    // by CLS instead of being attributed to the button click.
+    window.setTimeout(() => {
+      const banner = document.createElement("div");
+      banner.textContent = `Layout shift sample (${height}px)`;
+      banner.style.height = `${height}px`;
+      banner.style.display = "grid";
+      banner.style.placeItems = "center";
+      banner.style.background = "#d9962f33";
+      banner.style.border = "1px dashed #d9962f";
+      document.body.insertBefore(banner, panel);
+    }, 700);
+  });
+}
+
+bindLayoutShiftSample("cls-small", 80);
+bindLayoutShiftSample("cls-large", 320);
+
+on("longtask", () => {
+  busyWait(900);
+  console.log("[perf-lab] → Long Task 900ms complete; hide page to finalize");
+});
+
+function reloadScenario(scenario: string, delay?: number): void {
+  const query = new URLSearchParams({ perf: scenario });
+  if (delay !== undefined) query.set("delay", String(delay));
+  location.href = `${location.pathname}?${query}`;
+}
+
+on("lcp-fast", () => reloadScenario("slow-lcp", 250));
+on("lcp-slow", () => reloadScenario("slow-lcp", 1_800));
+on("fcp-slow", () => reloadScenario("blocked-fcp"));
+
+// 清空面板
 on("clear", () => {
   panel.replaceChildren();
 });
