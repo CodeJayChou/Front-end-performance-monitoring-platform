@@ -40,6 +40,14 @@ Start the browser demo separately:
 pnpm --filter @monitor/demo-web dev:browser
 ```
 
+The browser demo sends one page-load event automatically after initialization;
+the buttons can then generate error, network, resource and custom events. The
+Node demo uses the same ingest endpoint and explicitly flushes before exiting:
+
+```powershell
+pnpm --filter @monitor/demo-web dev
+```
+
 Open `http://localhost:5174`, then connect with:
 
 - Query API: `http://localhost:3002`

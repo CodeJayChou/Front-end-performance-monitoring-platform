@@ -4,6 +4,7 @@ import {
   useContext,
   useMemo,
   useState,
+  useEffect,
   type ReactNode,
 } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -57,6 +58,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   );
 
   const refresh = useCallback(() => setRefreshKey((value) => value + 1), []);
+
+  // New SDK events are asynchronous (ingest → processor → query). Keep an
+  // open dashboard current without requiring the user to press Refresh.
+  useEffect(() => {
+    if (!connection) return;
+    const timer = window.setInterval(refresh, 15_000);
+    return () => window.clearInterval(timer);
+  }, [connection, refresh]);
 
   return (
     <DashboardContext.Provider

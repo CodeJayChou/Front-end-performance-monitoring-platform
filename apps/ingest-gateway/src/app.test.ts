@@ -70,4 +70,34 @@ describe("ingest gateway", () => {
       ).statusCode,
     ).toBe(403);
   });
+
+  it("accepts JSON sent as text/plain by sendBeacon", async () => {
+    const event = createEvent("custom", { source: "beacon" }, {
+      projectId: "demo-project",
+      sessionId: "beacon-session",
+      platform: "web",
+      environment: "test",
+      sdk: { name: "test-sdk", version: "1.0.0" },
+    });
+    const eventRepository = { insertBatch: vi.fn().mockResolvedValue(1) };
+    const projectRepository = {
+      authorize: vi.fn().mockResolvedValue({ id: "demo-project", allowedOrigins: [] }),
+    };
+    const app = createApp(loadConfig({}), { eventRepository, projectRepository });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/events/batch",
+      headers: { "content-type": "text/plain;charset=UTF-8" },
+      payload: JSON.stringify({
+        projectId: "demo-project",
+        sdkKey: "demo-public-key",
+        events: [event],
+      }),
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({ accepted: 1, rejected: 0 });
+  });
 });

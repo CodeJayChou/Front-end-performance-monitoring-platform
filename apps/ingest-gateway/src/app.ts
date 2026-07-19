@@ -23,6 +23,17 @@ export function createApp(config: GatewayConfig, dependencies: AppDependencies =
 
   void app.register(cors, { origin: true, methods: ["POST", "OPTIONS"] });
 
+  // `navigator.sendBeacon()` serializes a string payload as text/plain even
+  // when the payload itself is JSON. The SDK uses Beacon as an unload-safe
+  // fallback, so parse that content type as JSON before validating the batch.
+  app.addContentTypeParser("text/plain", { parseAs: "string" }, (_request, body, done) => {
+    try {
+      done(null, JSON.parse(body as string));
+    } catch {
+      done(null, body);
+    }
+  });
+
   app.get("/health", async () => ({ status: "ok" }));
   app.get("/ready", async (_request, reply) => {
     try {
@@ -35,7 +46,12 @@ export function createApp(config: GatewayConfig, dependencies: AppDependencies =
 
   app.post<{ Body: EventBatchRequest }>("/api/v1/events/batch", async (request, reply) => {
     const envelope = validateBatchEnvelope(request.body, config);
-    if (!envelope.ok) return reply.code(envelope.reason === "batch_too_large" ? 413 : 400).send({ error: envelope.reason });
+    if (!envelope.ok) {
+      // Keep the reason visible in gateway logs so browser SDK delivery failures are
+      // diagnosable without logging the request body or public SDK key.
+      request.log.warn({ reason: envelope.reason }, "rejected event batch envelope");
+      return reply.code(envelope.reason === "batch_too_large" ? 413 : 400).send({ error: envelope.reason });
+    }
 
     if (!rateLimiter.allow(`${request.ip}:${envelope.projectId}`)) {
       return reply.code(429).send({ error: "rate_limited" });

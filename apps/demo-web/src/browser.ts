@@ -62,6 +62,12 @@ client.getHub().startTransaction("pageload", "navigation");
 
 console.log("[demo] SDK initialized, platform =", client.platform);
 
+// Emit one deterministic page-load event so a fresh dashboard connection can
+// verify the complete SDK → ingest → processor → query chain immediately.
+void client.capture(
+  createEvent("custom", { source: "demo-web", action: "page_load" }, client.platform),
+);
+
 const on = (id: string, fn: () => void): void => {
   document.getElementById(id)!.addEventListener("click", fn);
 };

@@ -3,6 +3,8 @@ import { createEvent } from "@monitor/event-contract";
 
 // 最终用户视角：一行初始化，按需配置采样率 / beforeSend
 const client = initWebSDK({
+  // Keep the Node demo on the same real ingest path as the browser demo.
+  dsn: "http://localhost:3001/api/v1/events/batch",
   projectId: "demo-project",
   sdkKey: "demo-public-key",
   environment: "development",
@@ -27,11 +29,14 @@ const isBrowser = typeof (globalThis as { window?: unknown }).window !== "undefi
 if (isBrowser) {
   throw new Error("test error");
 } else {
-  client.capture(
+  await client.capture(
     createEvent(
       "error",
       { kind: "js", message: "test error" },
       client.platform,
     ),
   );
+  // The Node process exits immediately; flush explicitly because the SDK's
+  // browser-oriented timer is intentionally unref'ed in Node.
+  await client.flush();
 }
