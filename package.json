@@ -20,6 +20,8 @@
     "mvp:db:down": "docker compose -f infrastructure/docker/docker-compose.mvp.yml down",
     "mvp:up": "docker compose -f infrastructure/docker/docker-compose.mvp.yml up -d --build",
     "mvp:down": "docker compose -f infrastructure/docker/docker-compose.mvp.yml down",
+    "dashboard:dev": "pnpm --filter @monitor/dashboard dev",
+    "dashboard:test": "pnpm --filter @monitor/dashboard test",
     "clean": "turbo run clean"
   },
   "devDependencies": {

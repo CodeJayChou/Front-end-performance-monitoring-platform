@@ -1,0 +1,16 @@
+FROM node:20-alpine AS build
+
+RUN corepack enable
+WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile
+ARG VITE_QUERY_API_URL=http://localhost:3002
+ARG VITE_PROJECT_ID=demo-project
+ENV VITE_QUERY_API_URL=$VITE_QUERY_API_URL
+ENV VITE_PROJECT_ID=$VITE_PROJECT_ID
+RUN pnpm --filter @monitor/dashboard build
+
+FROM nginx:1.27-alpine
+COPY infrastructure/docker/nginx.dashboard.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/dashboard/dist /usr/share/nginx/html
+EXPOSE 80

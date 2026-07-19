@@ -32,12 +32,24 @@ Service endpoints:
 - event ingest: `POST http://localhost:3001/api/v1/events/batch`
 - query health: `GET http://localhost:3002/health`
 - query readiness: `GET http://localhost:3002/ready`
+- dashboard: `http://localhost:5174`
 
 Start the browser demo separately:
 
 ```bash
 pnpm --filter @monitor/demo-web dev:browser
 ```
+
+Open `http://localhost:5174`, then connect with:
+
+- Query API: `http://localhost:3002`
+- project: `demo-project`
+- administrative query key: `demo-admin-key`
+
+The Dashboard stores the administrative key in `sessionStorage` only. This is
+appropriate for the local MVP; production deployment requires real user
+authentication or a backend-for-frontend and must not expose an administrative
+key in browser assets.
 
 ## 3. Database-only workflow
 
