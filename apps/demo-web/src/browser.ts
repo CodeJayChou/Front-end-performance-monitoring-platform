@@ -9,6 +9,21 @@ import { createEvent } from "@monitor/event-contract";
  */
 
 const panel = document.getElementById("log")!;
+const scenarioParams = new URLSearchParams(location.search);
+const pendingLcpDiagnostics: Array<Record<string, unknown>> = [];
+let sendLcpDiagnostic = (payload: Record<string, unknown>): void => {
+  pendingLcpDiagnostics.push(payload);
+};
+
+function getScenarioRelease(): string {
+  const scenario = scenarioParams.get("perf");
+  if (scenario === "slow-lcp") {
+    const delay = Number(scenarioParams.get("delay")) || 1_500;
+    return `demo-web@lcp-${delay}ms-v7`;
+  }
+  if (scenario === "blocked-fcp") return "demo-web@fcp-blocked";
+  return "demo-web@0.1.0";
+}
 
 function busyWait(durationMs: number): void {
   const startedAt = performance.now();
@@ -17,23 +32,143 @@ function busyWait(durationMs: number): void {
   }
 }
 
+function observeLcpCandidates(): void {
+  if (typeof PerformanceObserver === "undefined") return;
+  try {
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        const candidate = entry as PerformanceEntry & {
+          element?: Element;
+          size?: number;
+          url?: string;
+        };
+        const element = candidate.element?.tagName ?? "unknown";
+        sendLcpDiagnostic({
+          source: "lcp-diagnostic",
+          action: "native_candidate",
+          startTime: candidate.startTime,
+          element,
+          size: candidate.size ?? null,
+          url: candidate.url ?? "",
+          visibilityState: document.visibilityState,
+          scrollY: window.scrollY,
+        });
+        console.log(
+          `[perf-lab] native LCP candidate: ${Math.round(candidate.startTime)}ms element=${element} size=${candidate.size ?? "n/a"} url=${candidate.url ?? ""}`,
+        );
+      }
+    });
+    observer.observe({ type: "largest-contentful-paint", buffered: true });
+  } catch {
+    // Older browsers may not support this entry type.
+  }
+}
+
+function createLcpRaster(delay: number): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1_600;
+  canvas.height = 900;
+  const context = canvas.getContext("2d");
+  if (!context) return "";
+
+  const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, "#172554");
+  gradient.addColorStop(0.55, "#4338ca");
+  gradient.addColorStop(1, "#be185d");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(103, 232, 249, 0.24)";
+  context.beginPath();
+  context.arc(1_310, 210, 320, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = "#e0f2fe";
+  context.font = "600 48px Segoe UI, Arial, sans-serif";
+  context.fillText("PERFORMANCE LAB", 96, 310);
+  context.fillStyle = "#ffffff";
+  context.font = "800 112px Segoe UI, Arial, sans-serif";
+  context.fillText("LCP TEST HERO", 88, 470);
+  context.fillStyle = "#c7d2fe";
+  context.font = "500 44px Segoe UI, Arial, sans-serif";
+  context.fillText(`Rendered after ${delay}ms`, 96, 560);
+  return canvas.toDataURL("image/png");
+}
+
 function loadRenderScenario(): void {
-  const params = new URLSearchParams(location.search);
-  const scenario = params.get("perf");
+  const scenario = scenarioParams.get("perf");
   if (scenario === "slow-lcp") {
-    const delay = Number(params.get("delay")) || 1_500;
+    document.body.classList.add("lcp-scenario");
+    history.scrollRestoration = "manual";
+    window.scrollTo(0, 0);
+    const delay = Number(scenarioParams.get("delay")) || 1_500;
+    const status = document.getElementById("scenario-status");
+    if (status) {
+      status.hidden = false;
+      status.textContent = `Keep this tab visible for ${delay}ms; wait for the LCP image to paint before switching tabs`;
+    }
     window.setTimeout(() => {
       const hero = document.getElementById("scenario-hero");
       if (!hero) return;
+      const image = document.createElement("img");
+      image.alt = `Delayed LCP test image (${delay}ms)`;
+      image.width = 1_200;
+      image.height = 600;
+      image.addEventListener(
+        "load",
+        () => {
+          const loadedAt = Math.round(performance.now());
+          console.log(
+            `[perf-lab] Delayed LCP image loaded at about ${loadedAt}ms (configured delay ${delay}ms)`,
+          );
+          requestAnimationFrame(() => {
+            const entries = performance.getEntriesByType("largest-contentful-paint");
+            const candidate = entries.at(-1);
+            const rect = hero.getBoundingClientRect();
+            sendLcpDiagnostic({
+              source: "lcp-diagnostic",
+              action: "scenario_painted",
+              configuredDelay: delay,
+              paintedAt: performance.now(),
+              visibilityState: document.visibilityState,
+              scrollY: window.scrollY,
+              viewportHeight: window.innerHeight,
+              rectTop: rect.top,
+              rectBottom: rect.bottom,
+              rectWidth: rect.width,
+              rectHeight: rect.height,
+              exposedCandidateStartTime: candidate?.startTime ?? null,
+            });
+            if (status) {
+              status.textContent = `LCP image painted at about ${Math.round(performance.now())}ms; switch tabs now to finalize and report it`;
+            }
+            console.log(
+              `[perf-lab] LCP candidate after image paint: ${candidate ? Math.round(candidate.startTime) : "not exposed"}ms`,
+            );
+          });
+        },
+        { once: true },
+      );
+      const label = document.createElement("h1");
+      label.className = "scenario-hero-label";
+      label.textContent = `DELAYED LCP ${delay}MS`;
       hero.hidden = false;
-      hero.textContent = "Delayed LCP hero";
+      hero.textContent = `Delayed LCP hero · ${delay}ms`;
+      hero.replaceChildren(label, image);
+      image.src = createLcpRaster(delay);
     }, delay);
   }
-  if (scenario === "blocked-fcp") busyWait(1_200);
+  if (scenario === "blocked-fcp") {
+    const status = document.getElementById("scenario-status");
+    if (status) {
+      status.hidden = false;
+      status.textContent = "FCP 场景已加载：首屏主线程阻塞 1200ms";
+    }
+    busyWait(1_200);
+  }
 }
 
 // Run before SDK initialization so the scenario is part of the page's real
 // paint lifecycle, rather than a synthetic performance event.
+observeLcpCandidates();
 loadRenderScenario();
 
 /** 把一行日志渲染到页面面板，并按 stage / drop 上色。 */
@@ -72,7 +207,7 @@ const client = initWebSDK({
   projectId: "demo-project",
   sdkKey: "demo-public-key",
   environment: "development",
-  release: "demo-web@0.1.0",
+  release: getScenarioRelease(),
   debug: true,
   sampleRate: 1,
   beforeSend(event) {
@@ -80,6 +215,11 @@ const client = initWebSDK({
     return event;
   },
 });
+
+sendLcpDiagnostic = (payload): void => {
+  void client.capture(createEvent("custom", payload, client.platform));
+};
+for (const payload of pendingLcpDiagnostics.splice(0)) sendLcpDiagnostic(payload);
 
 // 写入上下文 + 开启 transaction：让每条事件都带上 context 与 trace
 client.scope.setUser({ id: "u_1001" }).setRoute("/demo");
@@ -173,7 +313,10 @@ function bindLayoutShiftSample(id: string, height: number): void {
       banner.style.placeItems = "center";
       banner.style.background = "#d9962f33";
       banner.style.border = "1px dashed #d9962f";
-      document.body.insertBefore(banner, panel);
+      const main = document.querySelector(".demo-main");
+      const scenarioHero = document.getElementById("scenario-hero");
+      if (main && scenarioHero) main.insertBefore(banner, scenarioHero);
+      else main?.appendChild(banner);
     }, 700);
   });
 }
@@ -193,7 +336,7 @@ function reloadScenario(scenario: string, delay?: number): void {
 }
 
 on("lcp-fast", () => reloadScenario("slow-lcp", 250));
-on("lcp-slow", () => reloadScenario("slow-lcp", 1_800));
+on("lcp-slow", () => reloadScenario("slow-lcp", 4_500));
 on("fcp-slow", () => reloadScenario("blocked-fcp"));
 
 // 清空面板

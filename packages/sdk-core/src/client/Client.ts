@@ -85,6 +85,8 @@ export class Client {
   private readonly beforeSend?: BeforeSend;
   private readonly debug: boolean;
   private readonly sessionId: string;
+  /** capture() tasks that have not reached the transport yet. */
+  private readonly pendingCaptures = new Set<Promise<void>>();
 
   constructor(private readonly config: ClientConfig) {
     this.runtime = config.runtime ?? webPlatform;
@@ -195,16 +197,23 @@ export class Client {
    */
   close(): void {
     this.integrations.forEach((integration) => integration.teardown?.());
-    const closing = this.transport.close?.();
-    if (closing instanceof Promise) {
-      void closing.catch((error: unknown) => {
-        if (this.debug) console.warn("[SDK INTERNAL ERROR] transport close failed", error);
-      });
-    }
+    const closing = (async () => {
+      await this.flush();
+      await this.transport.close?.();
+    })();
+    void closing.catch((error: unknown) => {
+      if (this.debug) console.warn("[SDK INTERNAL ERROR] transport close failed", error);
+    });
   }
 
   /** 立即刷新批量出口；测试、页面隐藏和显式提交场景可使用。 */
   async flush(): Promise<void> {
+    // A Web Vital callback calls capture() synchronously, but its middleware
+    // pipeline is asynchronous. Wait for those events to reach the transport
+    // before flushing, otherwise visibilitychange can flush an empty queue.
+    while (this.pendingCaptures.size > 0) {
+      await Promise.all([...this.pendingCaptures]);
+    }
     await this.transport.flush?.();
   }
 
@@ -212,7 +221,14 @@ export class Client {
    * 采集一个事件 —— 平台唯一入口。经校验 → 插件钩子 → Scope 注入 →
    * middleware → beforeSend 后送出。任一环节判定丢弃即静默返回。
    */
-  async capture(event: BaseEvent): Promise<void> {
+  capture(event: BaseEvent): Promise<void> {
+    const task = this.processCapture(event);
+    this.pendingCaptures.add(task);
+    void task.finally(() => this.pendingCaptures.delete(task));
+    return task;
+  }
+
+  private async processCapture(event: BaseEvent): Promise<void> {
     try {
       // 0. 结构校验：脏数据不进入链路
       if (!validateEvent(event)) {

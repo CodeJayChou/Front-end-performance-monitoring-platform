@@ -11,7 +11,7 @@ const metrics = ["LCP", "CLS", "INP", "FCP", "FP"];
 export function PerformancePage() {
   const { client, filters, refreshKey, refresh } = useDashboard();
   const [metric, setMetric] = useState("LCP");
-  const apiFilters = useMemo(() => toApiFilters(filters), [filters]);
+  const apiFilters = useMemo(() => toApiFilters(filters), [filters, refreshKey]);
   const state = useApiData(
     (signal) => client ? client.performance(apiFilters, metric, signal) : Promise.reject(new Error("尚未配置连接")),
     [client, metric, apiFilters.from, apiFilters.to, apiFilters.environment, apiFilters.release, apiFilters.platform, refreshKey],

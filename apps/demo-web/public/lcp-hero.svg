@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title description">
+  <title id="title">LCP test hero</title>
+  <desc id="description">A large image used as a deterministic Largest Contentful Paint candidate.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#172554" />
+      <stop offset="0.55" stop-color="#4338ca" />
+      <stop offset="1" stop-color="#be185d" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0.82" cy="0.18" r="0.72">
+      <stop offset="0" stop-color="#67e8f9" stop-opacity="0.72" />
+      <stop offset="1" stop-color="#67e8f9" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="600" rx="28" fill="url(#background)" />
+  <rect width="1200" height="600" rx="28" fill="url(#glow)" />
+  <circle cx="1035" cy="455" r="220" fill="#f472b6" opacity="0.18" />
+  <circle cx="1060" cy="425" r="125" fill="#fde68a" opacity="0.16" />
+  <path d="M0 490 C240 385 380 565 650 440 C860 342 1010 410 1200 300 L1200 600 L0 600 Z" fill="#020617" opacity="0.3" />
+  <text x="72" y="236" fill="#e0f2fe" font-family="Segoe UI, Arial, sans-serif" font-size="35" font-weight="600" letter-spacing="9">PERFORMANCE LAB</text>
+  <text x="66" y="348" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="92" font-weight="800">LCP TEST HERO</text>
+  <text x="72" y="414" fill="#c7d2fe" font-family="Segoe UI, Arial, sans-serif" font-size="30">Delayed image candidate · 1200 × 600</text>
+</svg>

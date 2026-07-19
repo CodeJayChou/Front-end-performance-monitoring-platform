@@ -13,7 +13,7 @@ export function ErrorsPage() {
   const location = useLocation();
   const apiFilters = useMemo(
     () => toApiFilters(filters, new Date(), { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
-    [filters, page],
+    [filters, page, refreshKey],
   );
   const state = useApiData(
     (signal) => client ? client.errors(apiFilters, signal) : Promise.reject(new Error("尚未配置连接")),

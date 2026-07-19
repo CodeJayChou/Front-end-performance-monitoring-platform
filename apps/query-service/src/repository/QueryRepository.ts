@@ -170,7 +170,10 @@ function eventFilter(projectId: string, filters: QueryFilters): SqlFilter {
 
 function aggregateFilter(projectId: string, filters: QueryFilters): SqlFilter {
   const sql: SqlFilter = {
-    clause: "project_id = $1 AND bucket_start >= $2 AND bucket_start < $3",
+    // Buckets are truncated to the minute. Truncate the lower bound too, or
+    // the partial first minute disappears whenever `from` contains seconds.
+    clause:
+      "project_id = $1 AND bucket_start >= date_trunc('minute', $2::timestamptz) AND bucket_start < $3",
     values: [projectId, filters.from, filters.to],
   };
   addCommonFilters(sql, filters, true);

@@ -8,7 +8,17 @@ export class FlushOnPageHideIntegration extends BaseIntegration {
     const flush = (): void => {
       void client.flush();
     };
+    const flushWhenHidden = (): void => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    // Web Vitals finalize on visibilitychange. Flush there as well as on
+    // pagehide so the final LCP/CLS/INP event is not left in the batch queue
+    // during a navigation or tab close.
+    document.addEventListener("visibilitychange", flushWhenHidden, true);
     window.addEventListener("pagehide", flush, true);
-    this.onCleanup(() => window.removeEventListener("pagehide", flush, true));
+    this.onCleanup(() => {
+      document.removeEventListener("visibilitychange", flushWhenHidden, true);
+      window.removeEventListener("pagehide", flush, true);
+    });
   }
 }

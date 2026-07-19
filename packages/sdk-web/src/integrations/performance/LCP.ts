@@ -1,31 +1,24 @@
 import { BaseIntegration } from "@monitor/sdk-core";
-import { observeEntries, onPageHidden, toPerformancePayload } from "./webVitals";
+import { onLCP } from "web-vitals";
+import { toPerformancePayload } from "./webVitals";
 
 /**
- * 最大内容绘制（Largest Contentful Paint）采集。
- *
- * LCP 会随渲染持续刷新，浏览器按时间顺序派发候选项，最后一条即最终值。
- * 因此累积取最后一次 startTime，在页面首次隐藏（visibilitychange → hidden）时定稿上报一次。
+ * Collect the final Largest Contentful Paint using web-vitals. The reference
+ * implementation drains pending PerformanceObserver entries when the page is
+ * hidden, which avoids losing a delayed hero rendered shortly before unload.
  */
 export class LCPIntegration extends BaseIntegration {
   name = "LCP";
 
-  private value = 0;
-  private finalized = false;
-
   protected install(): void {
-    this.onCleanup(
-      observeEntries("largest-contentful-paint", (entries) => {
-        for (const entry of entries) this.value = entry.startTime;
-      }),
-    );
+    let active = true;
+    onLCP((metric) => {
+      if (!active) return;
+      this.emit("performance", toPerformancePayload("LCP", metric.value));
+    });
 
-    this.onCleanup(
-      onPageHidden(() => {
-        if (this.finalized || this.value <= 0) return;
-        this.finalized = true;
-        this.emit("performance", toPerformancePayload("LCP", this.value));
-      }),
-    );
+    this.onCleanup(() => {
+      active = false;
+    });
   }
 }

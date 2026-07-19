@@ -174,6 +174,41 @@ describe("Client", () => {
     expect(teardown).toHaveBeenCalledTimes(1);
   });
 
+  it("flush waits for in-flight capture before flushing the transport", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const transport = { send: vi.fn(), flush: vi.fn() };
+    const client = new Client({ platform: "web", transport });
+    client.addMiddleware({
+      name: "async-performance-stage",
+      handle: async (event, next) => {
+        await gate;
+        return next(event);
+      },
+    });
+
+    const capture = client.capture(
+      makeEvent({
+        type: "performance",
+        payload: { metric: "LCP", value: 1800, rating: "good" },
+      }),
+    );
+    const flush = client.flush();
+
+    await Promise.resolve();
+    expect(transport.flush).not.toHaveBeenCalled();
+
+    release();
+    await Promise.all([capture, flush]);
+    expect(transport.send).toHaveBeenCalledTimes(1);
+    expect(transport.flush).toHaveBeenCalledTimes(1);
+    expect(transport.send.mock.invocationCallOrder[0]).toBeLessThan(
+      transport.flush.mock.invocationCallOrder[0]!,
+    );
+  });
+
   it("debug 模式下打印事件流", async () => {
     const transport = { send: vi.fn() };
     const client = new Client({ platform: "web", transport, debug: true });

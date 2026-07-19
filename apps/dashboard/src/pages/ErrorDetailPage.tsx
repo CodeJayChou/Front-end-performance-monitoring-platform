@@ -10,7 +10,10 @@ export function ErrorDetailPage() {
   const { fingerprint = "" } = useParams();
   const location = useLocation();
   const { client, filters, refreshKey, refresh } = useDashboard();
-  const apiFilters = useMemo(() => toApiFilters(filters, new Date(), { limit: 20, offset: 0 }), [filters]);
+  const apiFilters = useMemo(
+    () => toApiFilters(filters, new Date(), { limit: 20, offset: 0 }),
+    [filters, refreshKey],
+  );
   const state = useApiData(
     (signal) => client ? client.errorDetail(fingerprint, apiFilters, signal) : Promise.reject(new Error("尚未配置连接")),
     [client, fingerprint, apiFilters.from, apiFilters.to, apiFilters.environment, apiFilters.release, apiFilters.platform, refreshKey],

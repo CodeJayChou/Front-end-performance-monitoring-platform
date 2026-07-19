@@ -6,14 +6,14 @@ import { FCPIntegration } from "./FCP";
 import { LCPIntegration } from "./LCP";
 import { CLSIntegration } from "./CLS";
 
+const onLCP = vi.hoisted(() => vi.fn());
+const onCLS = vi.hoisted(() => vi.fn());
+vi.mock("web-vitals", () => ({ onLCP, onCLS }));
+
 type EntriesCb = (list: { getEntries: () => PerformanceEntry[] }) => void;
-type Listener = () => void;
 
 const globalRef = globalThis as unknown as {
-  window?: {
-    addEventListener(type: string, cb: Listener, capture?: boolean): void;
-    removeEventListener(type: string, cb: Listener, capture?: boolean): void;
-  };
+  window?: object;
   document?: { visibilityState: string };
   PerformanceObserver?: unknown;
 };
@@ -21,12 +21,12 @@ const globalRef = globalThis as unknown as {
 // 每个 entryType → 触发其观测回调；模拟 PerformanceObserver + 页面可见性，避免引入 jsdom
 let emitters: Record<string, EntriesCb>;
 let disconnectSpy: ReturnType<typeof vi.fn>;
-let visListeners: Listener[];
 
 function installEnv() {
+  onLCP.mockClear();
+  onCLS.mockClear();
   emitters = {};
   disconnectSpy = vi.fn();
-  visListeners = [];
 
   class FakePerformanceObserver {
     constructor(private readonly cb: EntriesCb) {}
@@ -40,25 +40,12 @@ function installEnv() {
   globalRef.PerformanceObserver =
     FakePerformanceObserver as unknown as typeof PerformanceObserver;
 
-  globalRef.window = {
-    addEventListener(type, cb) {
-      if (type === "visibilitychange") visListeners.push(cb);
-    },
-    removeEventListener(type, cb) {
-      if (type === "visibilitychange")
-        visListeners = visListeners.filter((l) => l !== cb);
-    },
-  };
+  globalRef.window = {};
   globalRef.document = { visibilityState: "visible" };
 }
 
 function emit(type: string, entries: Partial<PerformanceEntry>[]) {
   emitters[type]?.({ getEntries: () => entries as PerformanceEntry[] });
-}
-
-function hidePage() {
-  globalRef.document!.visibilityState = "hidden";
-  visListeners.forEach((l) => l());
 }
 
 function payloadOf(capture: ReturnType<typeof vi.fn>): VitalPayload {
@@ -111,63 +98,63 @@ describe("FCPIntegration", () => {
 describe("LCPIntegration", () => {
   beforeEach(installEnv);
 
-  it("取最后一次 LCP 值，页面隐藏时才定稿上报", () => {
+  it("uses the final web-vitals value and emits it once", () => {
     const capture = vi.fn<(e: BaseEvent) => void>();
-    new LCPIntegration().setup({ capture } as unknown as Client);
+    const lcp = new LCPIntegration();
+    lcp.setup({ capture } as unknown as Client);
 
-    emit("largest-contentful-paint", [{ startTime: 2000 }]);
-    emit("largest-contentful-paint", [{ startTime: 3200 }]);
-    expect(capture).not.toHaveBeenCalled(); // 隐藏前不报
+    expect(onLCP).toHaveBeenCalledTimes(1);
+    const report = onLCP.mock.calls[0]![0] as (metric: { value: number }) => void;
+    report({ value: 3200 });
 
-    hidePage();
     expect(capture).toHaveBeenCalledTimes(1);
     expect(payloadOf(capture)).toEqual({
       metric: "LCP",
       value: 3200,
       rating: "needs-improvement",
     });
+
+    lcp.teardown();
   });
 
-  it("多次隐藏只定稿一次", () => {
+  it("does not emit after teardown", () => {
     const capture = vi.fn();
-    new LCPIntegration().setup({ capture } as unknown as Client);
-
-    emit("largest-contentful-paint", [{ startTime: 2000 }]);
-    hidePage();
-    hidePage();
-    expect(capture).toHaveBeenCalledTimes(1);
+    const lcp = new LCPIntegration();
+    lcp.setup({ capture } as unknown as Client);
+    const report = onLCP.mock.calls[0]![0] as (metric: { value: number }) => void;
+    lcp.teardown();
+    report({ value: 2000 });
+    expect(capture).not.toHaveBeenCalled();
   });
 });
 
 describe("CLSIntegration", () => {
   beforeEach(installEnv);
 
-  it("累加非输入引起的偏移，隐藏时上报 CLS（忽略 hadRecentInput）", () => {
+  it("uses web-vitals session-window CLS value", () => {
     const capture = vi.fn<(e: BaseEvent) => void>();
-    new CLSIntegration().setup({ capture } as unknown as Client);
+    const cls = new CLSIntegration();
+    cls.setup({ capture } as unknown as Client);
 
-    emit("layout-shift", [
-      { value: 0.05, hadRecentInput: false } as unknown as PerformanceEntry,
-      { value: 0.05, hadRecentInput: false } as unknown as PerformanceEntry,
-      { value: 0.5, hadRecentInput: true } as unknown as PerformanceEntry,
-    ]);
-    hidePage();
+    expect(onCLS).toHaveBeenCalledTimes(1);
+    const report = onCLS.mock.calls[0]![0] as (metric: { value: number }) => void;
+    report({ value: 0.1 });
 
     expect(capture).toHaveBeenCalledTimes(1);
     const payload = payloadOf(capture);
     expect(payload.metric).toBe("CLS");
     expect(payload.value).toBeCloseTo(0.1, 5);
     expect(payload.rating).toBe("good");
+    cls.teardown();
   });
 
-  it("teardown 后断开观测且不再上报", () => {
+  it("teardown 后不再上报", () => {
     const capture = vi.fn();
     const cls = new CLSIntegration();
     cls.setup({ capture } as unknown as Client);
+    const report = onCLS.mock.calls[0]![0] as (metric: { value: number }) => void;
     cls.teardown();
-
-    expect(disconnectSpy).toHaveBeenCalled();
-    hidePage(); // teardown 已解绑 visibilitychange
+    report({ value: 0.3 });
     expect(capture).not.toHaveBeenCalled();
   });
 });

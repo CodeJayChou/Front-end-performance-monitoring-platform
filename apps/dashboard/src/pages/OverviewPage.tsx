@@ -17,7 +17,7 @@ import {
 export function OverviewPage() {
   const { client, filters, refreshKey, refresh } = useDashboard();
   const location = useLocation();
-  const apiFilters = useMemo(() => toApiFilters(filters), [filters]);
+  const apiFilters = useMemo(() => toApiFilters(filters), [filters, refreshKey]);
   const state = useApiData(async (signal) => {
     if (!client) throw new Error("尚未配置连接");
     const [overview, errors, releases] = await Promise.all([

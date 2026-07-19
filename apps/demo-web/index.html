@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      if (new URLSearchParams(location.search).get("perf") === "slow-lcp") {
+        document.documentElement.classList.add("lcp-scenario");
+      }
+    </script>
     <title>web-sdk 流程触发页</title>
     <style>
       :root { color-scheme: light dark; }
@@ -124,27 +129,62 @@
       .perf-lab h2 { margin: 0 0 8px; font-size: 16px; }
       .perf-lab p { color: #888; margin: 0 0 12px; font-size: 13px; }
       .scenario-hero {
-        min-height: 130px;
+        margin: 16px 0;
+        overflow: hidden;
+        position: relative;
+        border-radius: 12px;
+        background: #17213a;
+      }
+      .scenario-hero img {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 2 / 1;
+        object-fit: cover;
+      }
+      .scenario-hero-label {
         display: grid;
         place-items: center;
-        margin: 16px 0;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #263b70, #8a4d73);
+        min-height: 260px;
+        margin: 0;
+        padding: 24px;
         color: white;
-        font-size: 42px;
-        font-weight: 700;
+        font-size: clamp(34px, 5vw, 72px);
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-shadow: 0 3px 18px #020617cc;
+        pointer-events: none;
+      }
+      .scenario-status {
+        margin: 16px 0 0;
+        padding: 10px 12px;
+        border-left: 3px solid #6b8afd;
+        color: #9fb5d4;
+        background: #6b8afd18;
+        font-size: 13px;
+      }
+      .lcp-scenario .demo-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .lcp-scenario .log-panel {
+        display: none;
       }
     </style>
   </head>
   <body>
     <div class="demo-layout">
       <main class="demo-main">
+        <div id="scenario-hero" class="scenario-hero" hidden></div>
+        <p id="scenario-status" class="scenario-status" hidden></p>
         <h1>web-sdk 流程触发页</h1>
         <p class="hint">
           点击按钮触发真实浏览器信号，观察事件穿过链路：<br />
           <code>integration → scope → middleware:* → transport</code>。<br />
           日志同时输出到右侧面板和浏览器 DevTools Console。
         </p>
+
+        <div id="scenario-hero" class="scenario-hero" hidden></div>
+        <p id="scenario-status" class="scenario-status" hidden></p>
 
         <div class="btns">
           <button id="err">抛未捕获错误 (window.onerror)</button>
@@ -168,12 +208,11 @@
             <button id="cls-large">CLS 大位移</button>
             <button id="longtask">Long Task (900ms)</button>
             <button id="lcp-fast">刷新：快速 LCP</button>
-            <button id="lcp-slow">刷新：慢 LCP</button>
+            <button id="lcp-slow">刷新：慢 LCP (&gt;4s)</button>
             <button id="fcp-slow">刷新：阻塞 FCP</button>
           </div>
         </section>
 
-        <div id="scenario-hero" class="scenario-hero" hidden></div>
       </main>
 
       <aside class="log-panel" aria-label="SDK 事件日志">
