@@ -39,7 +39,11 @@ pnpm mvp:down
 - `@monitor/sdk-web`：Web 错误、网络、行为和 Web Vitals 采集。
 - `@monitor/ingest-gateway`：批量接入、SDK Key/Origin 校验和幂等写入。
 - `@monitor/processor-worker`：错误指纹、错误分组、性能分钟聚合和失败重试。
-- `@monitor/query-service`：项目级管理鉴权、总览、性能、错误、事件和版本查询。
+- `@monitor/query-service`：项目级管理鉴权、P75/分钟趋势、场景、错误、事件和版本查询。
+- `@monitor/dashboard`：P75 核心指标、场景筛选、处理积压与数据新鲜度展示。
+
+批量出口在可重试失败后会保留批次，页面隐藏时主动刷新；历史数据可通过
+`RETENTION_DAYS=30 pnpm mvp:cleanup` 按保留期事务清理。
 
 Session Replay、告警、Source Map、完整 RBAC、Kafka、ClickHouse 和生产级 K8s 部署尚未纳入当前 MVP。
 

@@ -11,6 +11,8 @@ export class CLSIntegration extends BaseIntegration {
   name = "CLS";
 
   protected install(): void {
+    if (typeof document === "undefined") return;
+
     let active = true;
     onCLS((metric) => {
       if (!active) return;

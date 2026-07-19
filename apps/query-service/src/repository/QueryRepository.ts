@@ -12,12 +12,16 @@ export class QueryRepository {
   async overview(projectId: string, filters: QueryFilters): Promise<unknown> {
     const events = eventFilter(projectId, filters);
     const metrics = aggregateFilter(projectId, filters);
-    const [eventResult, metricResult] = await Promise.all([
+    const percentileEvents = eventFilter(projectId, filters);
+    const [eventResult, metricResult, percentileResult] = await Promise.all([
       this.pool.query(
         `SELECT count(*)::text AS total_events,
                 count(*) FILTER (WHERE type = 'error')::text AS error_events,
                 count(DISTINCT session_id)::text AS sessions,
-                count(*) FILTER (WHERE processing_status = 'failed')::text AS failed_events
+                count(*) FILTER (WHERE processing_status = 'failed')::text AS failed_events,
+                count(*) FILTER (WHERE processing_status IN ('pending', 'processing'))::text AS pending_events,
+                max(received_at) AS latest_received_at,
+                max(processed_at) AS latest_processed_at
          FROM events
          WHERE ${events.clause}`,
         events.values,
@@ -36,8 +40,31 @@ export class QueryRepository {
          ORDER BY metric`,
         metrics.values,
       ),
+      this.pool.query(
+        `SELECT payload->>'metric' AS metric,
+                percentile_cont(0.75) WITHIN GROUP (
+                  ORDER BY (payload->>'value')::double precision
+                ) AS p75
+         FROM events
+         WHERE ${percentileEvents.clause}
+           AND type = 'performance'
+           AND processing_status = 'processed'
+           AND payload->>'metric' IN ('FP', 'FCP', 'LCP', 'CLS', 'INP', 'TTFB')
+           AND jsonb_typeof(payload->'value') = 'number'
+         GROUP BY payload->>'metric'`,
+        percentileEvents.values,
+      ),
     ]);
-    return { ...eventResult.rows[0], vitals: metricResult.rows };
+    const percentiles = new Map(
+      percentileResult.rows.map((row) => [row.metric as string, row.p75]),
+    );
+    return {
+      ...eventResult.rows[0],
+      vitals: metricResult.rows.map((row) => ({
+        ...row,
+        p75: percentiles.get(row.metric as string) ?? null,
+      })),
+    };
   }
 
   async performanceSeries(
@@ -47,7 +74,9 @@ export class QueryRepository {
   ): Promise<unknown[]> {
     const sql = aggregateFilter(projectId, filters);
     if (metric) addClause(sql, "metric", metric);
-    const result = await this.pool.query(
+    const raw = performanceEventFilter(projectId, filters, metric);
+    const [result, percentileResult] = await Promise.all([
+      this.pool.query(
       `SELECT bucket_start, metric, rating,
               sum(sample_count)::text AS sample_count,
               sum(value_sum) / sum(sample_count) AS average,
@@ -58,8 +87,31 @@ export class QueryRepository {
        GROUP BY bucket_start, metric, rating
        ORDER BY bucket_start ASC, metric, rating`,
       sql.values,
+      ),
+      this.pool.query(
+        `SELECT date_trunc('minute', event_timestamp) AS bucket_start,
+                payload->>'metric' AS metric,
+                percentile_cont(0.75) WITHIN GROUP (
+                  ORDER BY (payload->>'value')::double precision
+                ) AS p75
+         FROM events
+         WHERE ${raw.clause}
+         GROUP BY date_trunc('minute', event_timestamp), payload->>'metric'`,
+        raw.values,
+      ),
+    ]);
+    const percentiles = new Map(
+      percentileResult.rows.map((row) => [
+        `${new Date(row.bucket_start as string | Date).toISOString()}|${String(row.metric)}`,
+        row.p75,
+      ]),
     );
-    return result.rows;
+    return result.rows.map((row) => ({
+      ...row,
+      p75: percentiles.get(
+        `${new Date(row.bucket_start as string | Date).toISOString()}|${String(row.metric)}`,
+      ) ?? null,
+    }));
   }
 
   async errors(projectId: string, filters: QueryFilters): Promise<unknown> {
@@ -164,7 +216,7 @@ function eventFilter(projectId: string, filters: QueryFilters): SqlFilter {
     clause: "project_id = $1 AND event_timestamp >= $2 AND event_timestamp < $3",
     values: [projectId, filters.from, filters.to],
   };
-  addCommonFilters(sql, filters);
+  addCommonFilters(sql, filters, false, true);
   return sql;
 }
 
@@ -180,12 +232,35 @@ function aggregateFilter(projectId: string, filters: QueryFilters): SqlFilter {
   return sql;
 }
 
+function performanceEventFilter(
+  projectId: string,
+  filters: QueryFilters,
+  metric?: string,
+): SqlFilter {
+  const sql: SqlFilter = {
+    clause:
+      "project_id = $1 AND event_timestamp >= date_trunc('minute', $2::timestamptz) AND event_timestamp < $3" +
+      " AND type = 'performance' AND processing_status = 'processed'" +
+      " AND payload->>'metric' IN ('FP', 'FCP', 'LCP', 'CLS', 'INP', 'TTFB')" +
+      " AND jsonb_typeof(payload->'value') = 'number'",
+    values: [projectId, filters.from, filters.to],
+  };
+  addCommonFilters(sql, filters, false, true);
+  if (metric) {
+    const index = sql.values.push(metric);
+    sql.clause += ` AND payload->>'metric' = $${index}`;
+  }
+  return sql;
+}
+
 function groupFilter(projectId: string, filters: QueryFilters): SqlFilter {
   const sql: SqlFilter = {
     clause: "project_id = $1 AND last_seen >= $2 AND first_seen < $3",
     values: [projectId, filters.from, filters.to],
   };
-  addCommonFilters(sql, filters, true);
+  // Scenario is a performance-only aggregation dimension; error groups do
+  // not carry it and must remain queryable even if an unknown client sends it.
+  addCommonFilters(sql, { ...filters, scenario: undefined }, true);
   return sql;
 }
 
@@ -193,6 +268,7 @@ function addCommonFilters(
   sql: SqlFilter,
   filters: QueryFilters,
   emptyRelease = false,
+  eventContext = false,
 ): void {
   if (filters.environment) addClause(sql, "environment", filters.environment);
   if (filters.release === "(none)") {
@@ -202,6 +278,12 @@ function addCommonFilters(
     addClause(sql, "release", filters.release);
   }
   if (filters.platform) addClause(sql, "platform", filters.platform);
+  if (filters.scenario) {
+    const index = sql.values.push(filters.scenario);
+    sql.clause += eventContext
+      ? ` AND COALESCE(context->'tags'->>'scenario', 'default') = $${index}`
+      : ` AND scenario = $${index}`;
+  }
 }
 
 function addClause(sql: SqlFilter, column: string, value: unknown): void {

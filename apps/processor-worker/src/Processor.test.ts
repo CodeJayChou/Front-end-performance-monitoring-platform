@@ -12,6 +12,7 @@ const event: ClaimedEvent = {
   environment: "test",
   release: null,
   platform: "web",
+  context: {},
   payload: { kind: "js", message: "boom" },
   processingAttempts: 1,
 };

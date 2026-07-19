@@ -7,6 +7,7 @@ export interface ClaimedEvent {
   environment: string;
   release: string | null;
   platform: string;
+  context: unknown;
   payload: unknown;
   processingAttempts: number;
 }

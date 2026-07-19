@@ -11,7 +11,9 @@ describe("INPIntegration", () => {
   it("registers onINP and emits the measured value with its rating", () => {
     vi.useFakeTimers();
     const previousWindow = (globalThis as { window?: unknown }).window;
+    const previousDocument = (globalThis as { document?: unknown }).document;
     (globalThis as { window?: unknown }).window = {};
+    (globalThis as { document?: unknown }).document = {};
     const capture = vi.fn<(event: BaseEvent) => void>();
     const integration = new INPIntegration();
 
@@ -51,6 +53,8 @@ describe("INPIntegration", () => {
       onINP.mockClear();
       if (previousWindow === undefined) delete (globalThis as { window?: unknown }).window;
       else (globalThis as { window?: unknown }).window = previousWindow;
+      if (previousDocument === undefined) delete (globalThis as { document?: unknown }).document;
+      else (globalThis as { document?: unknown }).document = previousDocument;
     }
   });
 });

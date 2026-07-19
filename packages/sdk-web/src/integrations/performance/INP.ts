@@ -16,6 +16,8 @@ export class INPIntegration extends BaseIntegration {
   name = "INP";
 
   protected install(): void {
+    if (typeof document === "undefined") return;
+
     let latestValue: number | undefined;
     let snapshotTimer: ReturnType<typeof setInterval> | undefined;
     let active = true;

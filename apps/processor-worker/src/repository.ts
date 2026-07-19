@@ -10,6 +10,7 @@ interface ClaimedRow {
   environment: string;
   release: string | null;
   platform: string;
+  context: unknown;
   payload: unknown;
   processing_attempts: number;
 }
@@ -38,7 +39,7 @@ export class ProcessorRepository {
        WHERE event.id = candidates.id
        RETURNING event.id, event.project_id, event.event_id, event.type,
                  event.event_timestamp, event.environment, event.release, event.platform,
-                 event.payload, event.processing_attempts`,
+                 event.context, event.payload, event.processing_attempts`,
       [limit, staleAfterMs],
     );
     return result.rows.map(toClaimedEvent);
@@ -143,10 +144,10 @@ async function upsertMetricBucket(
 ): Promise<void> {
   await client.query(
     `INSERT INTO metric_buckets_1m (
-       project_id, environment, release, platform, metric, rating, bucket_start,
+       project_id, environment, release, platform, scenario, metric, rating, bucket_start,
        sample_count, value_sum, value_min, value_max
-     ) VALUES ($1, $2, $3, $4, $5, $6, date_trunc('minute', $7::timestamptz), 1, $8, $8, $8)
-     ON CONFLICT (project_id, environment, release, platform, metric, rating, bucket_start)
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, date_trunc('minute', $8::timestamptz), 1, $9, $9, $9)
+     ON CONFLICT (project_id, environment, release, platform, scenario, metric, rating, bucket_start)
      DO UPDATE SET
        sample_count = metric_buckets_1m.sample_count + 1,
        value_sum = metric_buckets_1m.value_sum + EXCLUDED.value_sum,
@@ -158,6 +159,7 @@ async function upsertMetricBucket(
       event.environment,
       event.release ?? "",
       event.platform,
+      scenarioFromContext(event.context),
       analysis.metric,
       analysis.rating,
       event.eventTimestamp,
@@ -176,7 +178,16 @@ function toClaimedEvent(row: ClaimedRow): ClaimedEvent {
     environment: row.environment,
     release: row.release,
     platform: row.platform,
+    context: row.context,
     payload: row.payload,
     processingAttempts: row.processing_attempts,
   };
+}
+
+function scenarioFromContext(value: unknown): string {
+  if (!value || typeof value !== "object") return "default";
+  const tags = (value as Record<string, unknown>).tags;
+  if (!tags || typeof tags !== "object") return "default";
+  const scenario = (tags as Record<string, unknown>).scenario;
+  return typeof scenario === "string" && scenario.length > 0 ? scenario : "default";
 }

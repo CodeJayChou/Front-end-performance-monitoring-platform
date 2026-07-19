@@ -54,4 +54,31 @@ describe("BatchHttpTransport", () => {
     await expect(transport.close()).resolves.toBeUndefined();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it("可重试失败会把批次放回队首并在下一次 flush 重发", async () => {
+    const fetch = vi.fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ ok: true, status: 202 });
+    const transport = new BatchHttpTransport(
+      {
+        endpoint: "/ingest",
+        projectId: "p1",
+        sdkKey: "public",
+        batchSize: 50,
+        flushIntervalMs: 60_000,
+        maxRetries: 0,
+      },
+      runtime(fetch),
+    );
+
+    await transport.send(createEvent("custom", { retained: true }));
+    await transport.flush();
+    await transport.flush();
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const retried = JSON.parse(String(fetch.mock.calls[1]![1]?.body)) as {
+      events: Array<{ payload: unknown }>;
+    };
+    expect(retried.events[0]?.payload).toEqual({ retained: true });
+  });
 });

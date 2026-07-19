@@ -79,7 +79,6 @@ export class BatchHttpTransport implements Transport {
   async flush(): Promise<void> {
     if (this.flushing) {
       await this.flushing;
-      if (this.queue.length > 0) return this.flush();
       return;
     }
     if (this.queue.length === 0) return;
@@ -88,11 +87,15 @@ export class BatchHttpTransport implements Transport {
     this.flushing = (async () => {
       while (this.queue.length > 0) {
         const batch = this.queue.splice(0, this.batchSize);
-        await this.sendBatch({
+        const handled = await this.sendBatch({
           projectId: this.projectId,
           sdkKey: this.sdkKey,
           events: batch,
         });
+        if (!handled) {
+          this.queue.unshift(...batch);
+          break;
+        }
       }
     })().finally(() => {
       this.flushing = undefined;
@@ -122,12 +125,12 @@ export class BatchHttpTransport implements Transport {
     this.timer = undefined;
   }
 
-  private async sendBatch(body: BatchBody): Promise<void> {
+  private async sendBatch(body: BatchBody): Promise<boolean> {
     let serialized: string;
     try {
       serialized = JSON.stringify(body);
     } catch {
-      return;
+      return true;
     }
 
     if (this.fetchFn) {
@@ -147,8 +150,9 @@ export class BatchHttpTransport implements Transport {
             signal: controller?.signal,
           });
           if (timeout) clearTimeout(timeout);
-          if (response.ok || (response.status >= 200 && response.status < 300)) return;
-          if (!this.isRetryable(response.status)) return;
+          if (response.ok || (response.status >= 200 && response.status < 300)) return true;
+          // A permanent client error must not block every later event.
+          if (!this.isRetryable(response.status)) return true;
         } catch {
           if (timeout) clearTimeout(timeout);
         }
@@ -158,7 +162,7 @@ export class BatchHttpTransport implements Transport {
     }
 
     // Best effort fallback for unload/old runtimes. Failure is intentionally swallowed.
-    this.runtime.global.navigator?.sendBeacon?.(this.endpoint, serialized);
+    return this.runtime.global.navigator?.sendBeacon?.(this.endpoint, serialized) === true;
   }
 
   private isRetryable(status: number): boolean {

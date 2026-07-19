@@ -44,6 +44,8 @@ export function OverviewPage() {
         <StatCard label="错误事件" value={overview.errorEvents.toLocaleString()} hint={`错误率 ${errorRate}`} tone={overview.errorEvents ? "danger" : "default"} />
         <StatCard label="会话数" value={overview.sessions.toLocaleString()} hint="去重 session_id" />
         <StatCard label="处理失败" value={overview.failedEvents.toLocaleString()} hint="Processor 最终失败" tone={overview.failedEvents ? "danger" : "success"} />
+        <StatCard label="等待处理" value={overview.pendingEvents.toLocaleString()} hint="pending + processing" tone={overview.pendingEvents ? "danger" : "success"} />
+        <StatCard label="最后处理" value={overview.latestProcessedAt ? formatDate(overview.latestProcessedAt) : "—"} hint={overview.latestReceivedAt ? `最后接收 ${formatDate(overview.latestReceivedAt)}` : "暂无接收数据"} />
       </section>
       <div className="content-grid two-thirds">
         <section className="panel">
@@ -53,7 +55,8 @@ export function OverviewPage() {
               {overview.vitals.map((vital) => (
                 <article key={vital.metric} className="vital-item">
                   <div><strong>{vital.metric}</strong><Badge tone={vital.poor > 0 ? "danger" : "good"}>{vital.sampleCount} 样本</Badge></div>
-                  <b>{formatMetric(vital.metric, vital.average)}</b>
+                  <b>{formatMetric(vital.metric, vital.p75 ?? vital.average)}</b>
+                  <small>P75 · 平均 {formatMetric(vital.metric, vital.average)}</small>
                   <div className="rating-bar" aria-label={`${vital.metric} rating 分布`}>
                     <i className="good" style={{ flex: vital.good || 0.1 }} />
                     <i className="warning" style={{ flex: vital.needsImprovement || 0.1 }} />

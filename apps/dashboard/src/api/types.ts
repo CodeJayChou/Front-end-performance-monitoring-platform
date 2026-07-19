@@ -19,6 +19,7 @@ export interface ApiFilters {
   environment?: string;
   release?: string;
   platform?: string;
+  scenario?: string;
   limit?: number;
   offset?: number;
 }
@@ -27,6 +28,7 @@ export interface VitalSummary {
   metric: string;
   sampleCount: number;
   average: number | null;
+  p75: number | null;
   good: number;
   needsImprovement: number;
   poor: number;
@@ -37,6 +39,9 @@ export interface Overview {
   errorEvents: number;
   sessions: number;
   failedEvents: number;
+  pendingEvents: number;
+  latestReceivedAt: string | null;
+  latestProcessedAt: string | null;
   vitals: VitalSummary[];
 }
 
@@ -46,6 +51,7 @@ export interface PerformancePoint {
   rating: string;
   sampleCount: number;
   average: number;
+  p75: number | null;
   minimum: number;
   maximum: number;
 }

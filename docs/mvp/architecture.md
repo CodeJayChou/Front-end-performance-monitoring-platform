@@ -33,6 +33,10 @@ The processor claims pending or stale events with `FOR UPDATE SKIP LOCKED`. This
 
 - error events receive a SHA-256 fingerprint based on kind, normalized title and culprit;
 - Web Vitals are aggregated into one-minute rating buckets;
+- performance buckets retain the `context.tags.scenario` dimension, without
+  overloading the release field;
+- query responses calculate P75 from processed raw performance events while
+  retaining bucket averages, minimums and maximums for diagnostics;
 - INP reports live changes and, after the first interaction, emits the current
   page-session value once per minute for long-lived-page time series;
 - the aggregate update and `processed` state are committed atomically;
@@ -40,6 +44,11 @@ The processor claims pending or stale events with `FOR UPDATE SKIP LOCKED`. This
 - stale `processing` events are reclaimed after a timeout.
 
 PostgreSQL remains the MVP queue and analytics store. Kafka or ClickHouse should only be introduced after measured volume or query latency requires them.
+
+The Web batch transport retries transient failures, puts an exhausted batch
+back at the front of its in-memory queue, and flushes on page hide. A
+transactional retention command removes expired raw events, inactive error
+groups and minute buckets.
 
 ## Query and trust boundaries
 

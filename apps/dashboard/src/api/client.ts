@@ -123,6 +123,9 @@ function normalizeOverview(value: unknown): Overview {
     errorEvents: numberFrom(row.error_events),
     sessions: numberFrom(row.sessions),
     failedEvents: numberFrom(row.failed_events),
+    pendingEvents: numberFrom(row.pending_events),
+    latestReceivedAt: row.latest_received_at === null ? null : optionalStringFrom(row.latest_received_at) ?? null,
+    latestProcessedAt: row.latest_processed_at === null ? null : optionalStringFrom(row.latest_processed_at) ?? null,
     vitals: Array.isArray(row.vitals) ? row.vitals.map(normalizeVital) : [],
   };
 }
@@ -133,6 +136,7 @@ function normalizeVital(value: unknown): VitalSummary {
     metric: stringFrom(row.metric),
     sampleCount: numberFrom(row.sample_count),
     average: nullableNumberFrom(row.average),
+    p75: nullableNumberFrom(row.p75),
     good: numberFrom(row.good),
     needsImprovement: numberFrom(row.needs_improvement),
     poor: numberFrom(row.poor),
@@ -147,6 +151,7 @@ function normalizePerformancePoint(value: unknown): PerformancePoint {
     rating: stringFrom(row.rating),
     sampleCount: numberFrom(row.sample_count),
     average: numberFrom(row.average),
+    p75: nullableNumberFrom(row.p75),
     minimum: numberFrom(row.minimum),
     maximum: numberFrom(row.maximum),
   };

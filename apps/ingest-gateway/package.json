@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "db:migrate": "tsx src/migrate.ts",
+    "db:cleanup": "tsx src/cleanup.ts",
     "build": "tsup src/index.ts --format esm --clean",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",

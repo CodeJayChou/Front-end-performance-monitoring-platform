@@ -82,7 +82,18 @@ $env:TEST_DATABASE_URL = "postgres://monitor:monitor@localhost:5432/monitor"
 pnpm test:mvp:integration
 ```
 
-## 4. Stop services
+## 4. Retention cleanup
+
+Raw events, error groups that are no longer active, and minute metric buckets
+can be removed with a single transactional command. The default retention is
+30 days:
+
+```powershell
+$env:RETENTION_DAYS = "30"
+pnpm --filter @monitor/ingest-gateway db:cleanup
+```
+
+## 5. Stop services
 
 ```bash
 pnpm mvp:down

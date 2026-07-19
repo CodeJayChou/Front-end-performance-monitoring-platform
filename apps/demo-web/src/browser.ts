@@ -229,7 +229,10 @@ sendLcpDiagnostic = (payload): void => {
 for (const payload of pendingLcpDiagnostics.splice(0)) sendLcpDiagnostic(payload);
 
 // 写入上下文 + 开启 transaction：让每条事件都带上 context 与 trace
-client.scope.setUser({ id: "u_1001" }).setRoute("/demo");
+client.scope
+  .setUser({ id: "u_1001" })
+  .setRoute("/demo")
+  .setTag("scenario", scenarioParams.get("perf") || "default");
 client.scope.addBreadcrumb("page load");
 client.getHub().startTransaction("pageload", "navigation");
 

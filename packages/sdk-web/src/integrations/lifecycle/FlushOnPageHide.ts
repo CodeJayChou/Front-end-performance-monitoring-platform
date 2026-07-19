@@ -5,6 +5,8 @@ export class FlushOnPageHideIntegration extends BaseIntegration {
   name = "FlushOnPageHide";
 
   protected install(client: Client): void {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
     const flush = (): void => {
       void client.flush();
     };

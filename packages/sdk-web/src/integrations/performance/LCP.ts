@@ -11,6 +11,8 @@ export class LCPIntegration extends BaseIntegration {
   name = "LCP";
 
   protected install(): void {
+    if (typeof document === "undefined") return;
+
     let active = true;
     onLCP((metric) => {
       if (!active) return;

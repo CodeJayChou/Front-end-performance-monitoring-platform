@@ -6,6 +6,7 @@ export interface QueryFilters {
   environment?: string;
   release?: string;
   platform?: string;
+  scenario?: string;
   limit: number;
   offset: number;
 }
@@ -44,6 +45,7 @@ export function parseFilters(
       environment: optionalString(query.environment),
       release: optionalString(query.release),
       platform: optionalString(query.platform),
+      scenario: optionalString(query.scenario),
       limit,
       offset,
     },

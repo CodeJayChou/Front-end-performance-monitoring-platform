@@ -16,7 +16,10 @@ describe("QueryClient", () => {
       error_events: "2",
       sessions: "5",
       failed_events: "1",
-      vitals: [{ metric: "LCP", sample_count: "3", average: "1250", good: "2", needs_improvement: "1", poor: "0" }],
+      pending_events: "2",
+      latest_received_at: "2026-07-19T12:00:02.000Z",
+      latest_processed_at: "2026-07-19T12:00:03.000Z",
+      vitals: [{ metric: "LCP", sample_count: "3", average: "1250", p75: "1400", good: "2", needs_improvement: "1", poor: "0" }],
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -26,8 +29,8 @@ describe("QueryClient", () => {
       environment: "production",
     });
 
-    expect(result).toMatchObject({ totalEvents: 12, errorEvents: 2, sessions: 5 });
-    expect(result.vitals[0]).toMatchObject({ metric: "LCP", average: 1250, sampleCount: 3 });
+    expect(result).toMatchObject({ totalEvents: 12, errorEvents: 2, sessions: 5, pendingEvents: 2, latestProcessedAt: "2026-07-19T12:00:03.000Z" });
+    expect(result.vitals[0]).toMatchObject({ metric: "LCP", average: 1250, p75: 1400, sampleCount: 3 });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/projects/demo%20project/overview?");
     expect(url).toContain("environment=production");

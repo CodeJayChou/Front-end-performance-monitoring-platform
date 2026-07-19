@@ -10,6 +10,10 @@ export class FCPIntegration extends BaseIntegration {
   name = "FCP";
 
   protected install(): void {
+    // web-vitals reads document visibility during registration. Keep the Web
+    // SDK safe in SSR, Node-based demos and minimal test runtimes.
+    if (typeof document === "undefined") return;
+
     let active = true;
     onFCP((metric) => {
       if (!active) return;
