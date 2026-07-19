@@ -10,20 +10,11 @@ import { createEvent } from "@monitor/event-contract";
 
 const panel = document.getElementById("log")!;
 const scenarioParams = new URLSearchParams(location.search);
+const DEMO_RELEASE = "demo-web@0.2.0";
 const pendingLcpDiagnostics: Array<Record<string, unknown>> = [];
 let sendLcpDiagnostic = (payload: Record<string, unknown>): void => {
   pendingLcpDiagnostics.push(payload);
 };
-
-function getScenarioRelease(): string {
-  const scenario = scenarioParams.get("perf");
-  if (scenario === "slow-lcp") {
-    const delay = Number(scenarioParams.get("delay")) || 1_500;
-    return `demo-web@lcp-${delay}ms-v7`;
-  }
-  if (scenario === "blocked-fcp") return "demo-web@fcp-blocked";
-  return "demo-web@0.1.0";
-}
 
 function busyWait(durationMs: number): void {
   const startedAt = performance.now();
@@ -140,6 +131,7 @@ function loadRenderScenario(): void {
             if (status) {
               status.textContent = `LCP image painted at about ${Math.round(performance.now())}ms; switch tabs now to finalize and report it`;
             }
+            document.getElementById("log-toggle")?.removeAttribute("disabled");
             console.log(
               `[perf-lab] LCP candidate after image paint: ${candidate ? Math.round(candidate.startTime) : "not exposed"}ms`,
             );
@@ -162,7 +154,6 @@ function loadRenderScenario(): void {
       status.hidden = false;
       status.textContent = "FCP 场景已加载：首屏主线程阻塞 1200ms";
     }
-    busyWait(1_200);
   }
 }
 
@@ -195,11 +186,27 @@ function render(label: string, payload?: unknown): void {
 
 // 镜像 console.log：Client.log 用的就是 console.log(`[SDK FLOW] ...`, event)
 const nativeLog = console.log.bind(console);
+const deferPanelLogs = scenarioParams.get("perf") === "blocked-fcp";
+const pendingPanelLogs: Array<[label: string, payload?: unknown]> = [];
+let panelLogsReady = !deferPanelLogs;
 console.log = (...args: unknown[]): void => {
   nativeLog(...args);
   const [first, second] = args;
-  if (typeof first === "string") render(first, second);
+  if (typeof first !== "string") return;
+  if (panelLogsReady) render(first, second);
+  else pendingPanelLogs.push([first, second]);
 };
+
+// The lab FCP sample must not include debug-panel DOM work. Let the browser
+// complete one paint, then mirror the queued SDK logs into the panel.
+if (deferPanelLogs) {
+  requestAnimationFrame(() => {
+    window.setTimeout(() => {
+      panelLogsReady = true;
+      for (const [label, payload] of pendingPanelLogs.splice(0)) render(label, payload);
+    }, 0);
+  });
+}
 
 // 一行初始化；debug 打开事件流日志
 const client = initWebSDK({
@@ -207,7 +214,7 @@ const client = initWebSDK({
   projectId: "demo-project",
   sdkKey: "demo-public-key",
   environment: "development",
-  release: getScenarioRelease(),
+  release: DEMO_RELEASE,
   debug: true,
   sampleRate: 1,
   beforeSend(event) {
@@ -237,6 +244,14 @@ void client.capture(
 const on = (id: string, fn: () => void): void => {
   document.getElementById(id)!.addEventListener("click", fn);
 };
+
+on("log-toggle", () => {
+  const logPanel = document.querySelector<HTMLElement>(".log-panel")!;
+  const toggle = document.getElementById("log-toggle")!;
+  const isOpen = logPanel.classList.toggle("is-open");
+  toggle.setAttribute("aria-expanded", String(isOpen));
+  toggle.textContent = isOpen ? "Close SDK Logs" : "SDK Logs";
+});
 
 // 1. 未捕获错误：setTimeout 抛出 → 冒泡到 window.onerror → GlobalError 插件捕获
 on("err", () => {

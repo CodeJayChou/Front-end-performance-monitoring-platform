@@ -1,24 +1,23 @@
 import { BaseIntegration } from "@monitor/sdk-core";
-import { observeEntries, toPerformancePayload } from "./webVitals";
+import { onFCP } from "web-vitals";
+import { toPerformancePayload } from "./webVitals";
 
 /**
- * 首次内容绘制（First Contentful Paint）采集：
- * 监听 paint entry 的 "first-contentful-paint"，上报一次。
+ * Collect First Contentful Paint with the web-vitals reference lifecycle
+ * handling, including buffered entries, prerender activation and BFCache.
  */
 export class FCPIntegration extends BaseIntegration {
   name = "FCP";
 
-  private reported = false;
-
   protected install(): void {
-    this.onCleanup(
-      observeEntries("paint", (entries) => {
-        for (const entry of entries) {
-          if (this.reported || entry.name !== "first-contentful-paint") continue;
-          this.reported = true;
-          this.emit("performance", toPerformancePayload("FCP", entry.startTime));
-        }
-      }),
-    );
+    let active = true;
+    onFCP((metric) => {
+      if (!active) return;
+      this.emit("performance", toPerformancePayload("FCP", metric.value));
+    });
+
+    this.onCleanup(() => {
+      active = false;
+    });
   }
 }

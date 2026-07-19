@@ -53,8 +53,14 @@ export function PerformancePage() {
       <PageHeader eyebrow="PERFORMANCE" title="真实用户性能" description="按一分钟聚合观察 Core Web Vitals 的变化与质量分布。" action={
         <label className="metric-select">指标<select value={metric} onChange={(event) => setMetric(event.target.value)}>{metrics.map((item) => <option key={item}>{item}</option>)}</select></label>
       } />
+      {!filters.release ? (
+        <div className="data-scope-note" role="status">
+          <strong>当前正在合并全部版本的数据。</strong>
+          不同测试场景和历史异常样本会共同影响平均值及纵轴范围；复核单次实验时请在顶部选择对应版本。
+        </div>
+      ) : null}
       <section className="panel chart-panel">
-        <div className="panel-heading"><div><span>{metric} SERIES</span><h2>{metric} 时间趋势</h2></div></div>
+        <div className="panel-heading"><div><span>{metric} SERIES · {filters.release || "全部版本"}</span><h2>{metric} 时间趋势</h2></div></div>
         {state.loading ? <LoadingState /> : state.error ? <ErrorState error={state.error} onRetry={refresh} /> : state.data?.length ? <EChart option={option} label={`${metric} 按 rating 分组的时间趋势`} /> : <EmptyState title={`暂无 ${metric} 数据`} description="运行浏览器演示并等待 Processor 完成聚合后再刷新。" />}
       </section>
       {state.data?.length ? <section className="panel"><div className="panel-heading"><div><span>BUCKET DETAILS</span><h2>聚合明细</h2></div></div><div className="table-wrap"><table><thead><tr><th>时间</th><th>评级</th><th>平均</th><th>最小</th><th>最大</th><th>样本</th></tr></thead><tbody>{state.data.slice(-50).reverse().map((point, index) => <tr key={`${point.bucketStart}-${point.rating}-${index}`}><td>{new Date(point.bucketStart).toLocaleString("zh-CN")}</td><td>{point.rating}</td><td>{point.average.toFixed(metric === "CLS" ? 3 : 0)}</td><td>{point.minimum.toFixed(metric === "CLS" ? 3 : 0)}</td><td>{point.maximum.toFixed(metric === "CLS" ? 3 : 0)}</td><td>{point.sampleCount}</td></tr>)}</tbody></table></div></section> : null}

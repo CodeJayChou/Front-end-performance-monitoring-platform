@@ -8,7 +8,7 @@ const client = initWebSDK({
   projectId: "demo-project",
   sdkKey: "demo-public-key",
   environment: "development",
-  release: "demo-web@0.1.0",
+  release: "demo-web@0.2.0",
   sampleRate: 1, // 全量上报
   beforeSend(event) {
     // 这里可做：过滤敏感数据 / 采样 / 返回 null 丢弃事件

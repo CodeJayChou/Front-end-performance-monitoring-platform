@@ -4,8 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
-      if (new URLSearchParams(location.search).get("perf") === "slow-lcp") {
+      const scenario = new URLSearchParams(location.search).get("perf");
+      if (scenario === "slow-lcp") {
         document.documentElement.classList.add("lcp-scenario");
+      }
+      if (scenario === "blocked-fcp") {
+        const startedAt = performance.now();
+        while (performance.now() - startedAt < 1_200) {
+          // Deliberately block parsing before any content can paint.
+        }
       }
     </script>
     <title>web-sdk 流程触发页</title>
@@ -169,6 +176,37 @@
       .lcp-scenario .log-panel {
         display: none;
       }
+      .log-toggle {
+        display: none;
+      }
+      .lcp-scenario .log-toggle {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 1002;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-color: #6b8afd88;
+        background: #17213a;
+        color: #e6edf7;
+        box-shadow: 0 12px 30px #02061755;
+      }
+      .lcp-scenario .log-toggle:disabled {
+        opacity: .55;
+        cursor: wait;
+      }
+      .lcp-scenario .log-panel.is-open {
+        position: fixed;
+        right: 24px;
+        bottom: 80px;
+        top: auto;
+        z-index: 1001;
+        display: flex;
+        width: min(520px, calc(100vw - 48px));
+        height: min(70vh, 640px);
+        min-height: 280px;
+      }
     </style>
   </head>
   <body>
@@ -182,9 +220,6 @@
           <code>integration → scope → middleware:* → transport</code>。<br />
           日志同时输出到右侧面板和浏览器 DevTools Console。
         </p>
-
-        <div id="scenario-hero" class="scenario-hero" hidden></div>
-        <p id="scenario-status" class="scenario-status" hidden></p>
 
         <div class="btns">
           <button id="err">抛未捕获错误 (window.onerror)</button>
@@ -224,6 +259,17 @@
       </aside>
     </div>
 
-    <script type="module" src="/src/browser.ts"></script>
+    <button id="log-toggle" class="log-toggle" type="button" aria-expanded="false" disabled>SDK Logs</button>
+
+    <script type="module">
+      const loadDemo = () => import("/src/browser.ts");
+      if (new URLSearchParams(location.search).get("perf") === "blocked-fcp") {
+        requestAnimationFrame(() => {
+          window.setTimeout(() => void loadDemo(), 0);
+        });
+      } else {
+        void loadDemo();
+      }
+    </script>
   </body>
 </html>

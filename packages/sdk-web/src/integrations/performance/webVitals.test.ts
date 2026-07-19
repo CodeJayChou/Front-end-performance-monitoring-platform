@@ -6,9 +6,10 @@ import { FCPIntegration } from "./FCP";
 import { LCPIntegration } from "./LCP";
 import { CLSIntegration } from "./CLS";
 
+const onFCP = vi.hoisted(() => vi.fn());
 const onLCP = vi.hoisted(() => vi.fn());
 const onCLS = vi.hoisted(() => vi.fn());
-vi.mock("web-vitals", () => ({ onLCP, onCLS }));
+vi.mock("web-vitals", () => ({ onFCP, onLCP, onCLS }));
 
 type EntriesCb = (list: { getEntries: () => PerformanceEntry[] }) => void;
 
@@ -23,6 +24,7 @@ let emitters: Record<string, EntriesCb>;
 let disconnectSpy: ReturnType<typeof vi.fn>;
 
 function installEnv() {
+  onFCP.mockClear();
   onLCP.mockClear();
   onCLS.mockClear();
   emitters = {};
@@ -42,10 +44,6 @@ function installEnv() {
 
   globalRef.window = {};
   globalRef.document = { visibilityState: "visible" };
-}
-
-function emit(type: string, entries: Partial<PerformanceEntry>[]) {
-  emitters[type]?.({ getEntries: () => entries as PerformanceEntry[] });
 }
 
 function payloadOf(capture: ReturnType<typeof vi.fn>): VitalPayload {
@@ -75,7 +73,9 @@ describe("FCPIntegration", () => {
     const capture = vi.fn<(e: BaseEvent) => void>();
     new FCPIntegration().setup({ capture } as unknown as Client);
 
-    emit("paint", [{ name: "first-contentful-paint", startTime: 1000 }]);
+    expect(onFCP).toHaveBeenCalledTimes(1);
+    const report = onFCP.mock.calls[0]![0] as (metric: { value: number }) => void;
+    report({ value: 1000 });
 
     expect(capture).toHaveBeenCalledTimes(1);
     expect(capture.mock.calls[0]![0].type).toBe("performance");
@@ -86,11 +86,13 @@ describe("FCPIntegration", () => {
     });
   });
 
-  it("忽略 first-paint，只报 FCP", () => {
+  it("does not emit after teardown", () => {
     const capture = vi.fn();
-    new FCPIntegration().setup({ capture } as unknown as Client);
-
-    emit("paint", [{ name: "first-paint", startTime: 800 }]);
+    const fcp = new FCPIntegration();
+    fcp.setup({ capture } as unknown as Client);
+    const report = onFCP.mock.calls[0]![0] as (metric: { value: number }) => void;
+    fcp.teardown();
+    report({ value: 800 });
     expect(capture).not.toHaveBeenCalled();
   });
 });

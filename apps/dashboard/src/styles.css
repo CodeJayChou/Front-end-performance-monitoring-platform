@@ -78,6 +78,8 @@ code { font-family: "Cascadia Code", Consolas, monospace; }
 .panel-heading span { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .14em; }
 .panel-heading h2 { margin: 3px 0 0; font: 500 20px/1.25 Georgia, serif; }
 .panel-heading > a { color: var(--accent); font-size: 13px; }
+.data-scope-note { margin: 0; padding: 12px 14px; border: 1px solid #e7c98f; border-radius: 10px; background: var(--warning-soft); color: #765018; font-size: 13px; line-height: 1.6; }
+.data-scope-note strong { margin-right: 6px; }
 .vitals-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .vital-item { border: 1px solid var(--line); padding: 15px; }
 .vital-item > div:first-child { display: flex; justify-content: space-between; align-items: center; }
