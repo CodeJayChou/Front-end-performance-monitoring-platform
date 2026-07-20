@@ -1,6 +1,6 @@
 # Query API v1
 
-Base URL: `http://localhost:3002`
+Base URL: `http://localhost:13002`
 
 All project endpoints require a project-scoped administrative key:
 

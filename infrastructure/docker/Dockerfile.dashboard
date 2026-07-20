@@ -4,7 +4,7 @@ RUN corepack enable
 WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile
-ARG VITE_QUERY_API_URL=http://localhost:3002
+ARG VITE_QUERY_API_URL=http://localhost:13002
 ARG VITE_PROJECT_ID=demo-project
 ENV VITE_QUERY_API_URL=$VITE_QUERY_API_URL
 ENV VITE_PROJECT_ID=$VITE_PROJECT_ID

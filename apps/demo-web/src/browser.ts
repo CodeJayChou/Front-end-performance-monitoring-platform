@@ -210,7 +210,7 @@ if (deferPanelLogs) {
 
 // 一行初始化；debug 打开事件流日志
 const client = initWebSDK({
-  dsn: "http://localhost:3001/api/v1/events/batch",
+  dsn: "http://localhost:13001/api/v1/events/batch",
   projectId: "demo-project",
   sdkKey: "demo-public-key",
   environment: "development",

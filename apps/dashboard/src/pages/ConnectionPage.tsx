@@ -7,7 +7,7 @@ export function ConnectionPage() {
   const { saveConnection } = useDashboard();
   const navigate = useNavigate();
   const [form, setForm] = useState<ConnectionConfig>({
-    baseUrl: (import.meta.env.VITE_QUERY_API_URL as string | undefined) ?? "http://localhost:3002",
+    baseUrl: (import.meta.env.VITE_QUERY_API_URL as string | undefined) ?? "http://localhost:13002",
     projectId: (import.meta.env.VITE_PROJECT_ID as string | undefined) ?? "demo-project",
     adminKey: "",
   });

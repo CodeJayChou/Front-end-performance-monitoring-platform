@@ -92,16 +92,24 @@ export function useDashboard(): DashboardState {
 }
 
 function readConnection(): ConnectionConfig | null {
+  const configuredBaseUrl = import.meta.env.VITE_QUERY_API_URL as string | undefined;
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as ConnectionConfig;
-      if (parsed.baseUrl && parsed.projectId && parsed.adminKey) return parsed;
+      if (parsed.baseUrl && parsed.projectId && parsed.adminKey) {
+        if (parsed.baseUrl.replace(/\/$/, "") === "http://localhost:3002" && configuredBaseUrl) {
+          const migrated = { ...parsed, baseUrl: configuredBaseUrl.replace(/\/$/, "") };
+          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+          return migrated;
+        }
+        return parsed;
+      }
     }
   } catch {
     sessionStorage.removeItem(STORAGE_KEY);
   }
-  const baseUrl = import.meta.env.VITE_QUERY_API_URL as string | undefined;
+  const baseUrl = configuredBaseUrl;
   const projectId = import.meta.env.VITE_PROJECT_ID as string | undefined;
   const adminKey = import.meta.env.VITE_ADMIN_KEY as string | undefined;
   return baseUrl && projectId && adminKey ? { baseUrl, projectId, adminKey } : null;

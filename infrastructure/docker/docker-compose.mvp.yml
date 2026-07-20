@@ -41,7 +41,7 @@ services:
       DATABASE_URL: postgres://monitor:monitor@postgres:5432/monitor
       PORT: "3001"
     ports:
-      - "3001:3001"
+      - "13001:3001"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -71,7 +71,7 @@ services:
       DATABASE_URL: postgres://monitor:monitor@postgres:5432/monitor
       PORT: "3002"
     ports:
-      - "3002:3002"
+      - "13002:3002"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -86,7 +86,7 @@ services:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.dashboard
       args:
-        VITE_QUERY_API_URL: http://localhost:3002
+        VITE_QUERY_API_URL: http://localhost:13002
         VITE_PROJECT_ID: demo-project
     ports:
       - "5174:80"

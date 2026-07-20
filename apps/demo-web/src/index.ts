@@ -4,7 +4,7 @@ import { createEvent } from "@monitor/event-contract";
 // 最终用户视角：一行初始化，按需配置采样率 / beforeSend
 const client = initWebSDK({
   // Keep the Node demo on the same real ingest path as the browser demo.
-  dsn: "http://localhost:3001/api/v1/events/batch",
+  dsn: "http://localhost:13001/api/v1/events/batch",
   projectId: "demo-project",
   sdkKey: "demo-public-key",
   environment: "development",

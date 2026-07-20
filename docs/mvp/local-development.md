@@ -27,11 +27,11 @@ Demo credentials:
 
 Service endpoints:
 
-- ingest health: `GET http://localhost:3001/health`
-- ingest readiness: `GET http://localhost:3001/ready`
-- event ingest: `POST http://localhost:3001/api/v1/events/batch`
-- query health: `GET http://localhost:3002/health`
-- query readiness: `GET http://localhost:3002/ready`
+- ingest health: `GET http://localhost:13001/health`
+- ingest readiness: `GET http://localhost:13001/ready`
+- event ingest: `POST http://localhost:13001/api/v1/events/batch`
+- query health: `GET http://localhost:13002/health`
+- query readiness: `GET http://localhost:13002/ready`
 - dashboard: `http://localhost:5174`
 
 Start the browser demo separately:
@@ -50,7 +50,7 @@ pnpm --filter @monitor/demo-web dev
 
 Open `http://localhost:5174`, then connect with:
 
-- Query API: `http://localhost:3002`
+- Query API: `http://localhost:13002`
 - project: `demo-project`
 - administrative query key: `demo-admin-key`
 
