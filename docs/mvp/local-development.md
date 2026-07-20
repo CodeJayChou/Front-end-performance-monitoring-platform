@@ -59,6 +59,22 @@ appropriate for the local MVP; production deployment requires real user
 authentication or a backend-for-frontend and must not expose an administrative
 key in browser assets.
 
+### Validate Source Map and error workflow
+
+1. Build the monitored application with Source Map output and give the SDK the
+   same release used by that build.
+2. Open Dashboard → Source Maps, enter that release and the generated JavaScript
+   artifact path (for example `assets/index-abc123.js`), then select its `.map`
+   file and upload it.
+3. Trigger an error in the browser demo and open Dashboard → Errors → the new
+   error group. The detail page shows the symbolication status, original source
+   file/line, source code line and breadcrumbs.
+4. Mark the issue as resolved, trigger the same error again, then refresh the
+   detail. Its status returns to unresolved and the regression count increases.
+
+Source Map matching is release-sensitive. A `map_not_found` result normally
+means the event release or generated artifact path differs from the upload.
+
 ## 3. Database-only workflow
 
 ```bash

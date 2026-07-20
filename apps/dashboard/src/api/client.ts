@@ -11,6 +11,9 @@ import type {
   PageResult,
   PerformancePoint,
   ReleaseSummary,
+  SourceMapArtifact,
+  SourceMapUpload,
+  ErrorIssueStatus,
   VitalSummary,
 } from "./types";
 
@@ -64,6 +67,9 @@ export class QueryClient {
           group: normalizeErrorGroup(record.group),
           events: Array.isArray(record.events)
             ? record.events.map(normalizeEvent)
+            : [],
+          history: Array.isArray(record.history)
+            ? record.history.map(normalizeIssueHistory)
             : [],
         };
       },
@@ -121,6 +127,36 @@ export class QueryClient {
       total: numberFrom(recordFrom(value).total),
       items: arrayFrom(value, "items").map(normalizeAlertIncident),
     }));
+  }
+
+  updateErrorIssue(
+    fingerprint: string,
+    status: ErrorIssueStatus,
+    note: string | null,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return this.request(`errors/${encodeURIComponent(fingerprint)}/status`, {
+      method: "PATCH",
+      body: { status, note },
+      signal,
+    }).then(() => undefined);
+  }
+
+  sourceMaps(signal?: AbortSignal): Promise<SourceMapArtifact[]> {
+    return this.get("source-maps", {}, signal).then((value) =>
+      arrayFrom(value, "items").map(normalizeSourceMap),
+    );
+  }
+
+  uploadSourceMap(input: SourceMapUpload, signal?: AbortSignal): Promise<void> {
+    return this.request("source-maps", { method: "POST", body: input, signal }).then(() => undefined);
+  }
+
+  deleteSourceMap(id: string, signal?: AbortSignal): Promise<void> {
+    return this.request(`source-maps/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      signal,
+    }).then(() => undefined);
   }
 
   private async get(
@@ -262,6 +298,11 @@ function normalizeErrorGroup(value: unknown): ErrorGroup {
     environments: stringArrayFrom(row.environments),
     releases: stringArrayFrom(row.releases),
     platforms: stringArrayFrom(row.platforms),
+    status: normalizeIssueStatus(row.status),
+    note: nullableStringFrom(row.note),
+    resolvedAt: nullableStringFrom(row.resolved_at),
+    lastRegressedAt: nullableStringFrom(row.last_regressed_at),
+    regressionCount: numberFrom(row.regression_count),
   };
 }
 
@@ -282,7 +323,58 @@ function normalizeEvent(value: unknown): EventRecord {
     context: row.context,
     payload: row.payload,
     processingStatus: optionalStringFrom(row.processing_status),
+    symbolicationStatus: optionalStringFrom(row.symbolication_status),
+    symbolicatedStack: Array.isArray(row.symbolicated_stack)
+      ? row.symbolicated_stack.map((frame) => {
+          const item = recordFrom(frame);
+          return {
+            file: optionalStringFrom(item.file),
+            line: nullableNumberFrom(item.line) ?? undefined,
+            col: nullableNumberFrom(item.col) ?? undefined,
+            functionName: optionalStringFrom(item.functionName),
+            originalFile: stringFrom(item.originalFile),
+            originalLine: numberFrom(item.originalLine),
+            originalCol: numberFrom(item.originalCol),
+            originalFunctionName: optionalStringFrom(item.originalFunctionName),
+            sourceLine: optionalStringFrom(item.sourceLine),
+            inApp: item.inApp === true,
+          };
+        })
+      : [],
   };
+}
+
+function normalizeIssueHistory(value: unknown) {
+  const row = recordFrom(value);
+  return {
+    id: stringFrom(row.id),
+    action: stringFrom(row.action),
+    fromStatus: nullableStringFrom(row.from_status),
+    toStatus: nullableStringFrom(row.to_status),
+    note: nullableStringFrom(row.note),
+    createdAt: stringFrom(row.created_at),
+  };
+}
+
+function normalizeSourceMap(value: unknown): SourceMapArtifact {
+  const row = recordFrom(value);
+  return {
+    id: stringFrom(row.id),
+    release: stringFrom(row.release),
+    dist: stringFrom(row.dist),
+    artifactName: stringFrom(row.artifact_name),
+    contentHash: stringFrom(row.content_hash),
+    sourceCount: numberFrom(row.source_count),
+    createdAt: stringFrom(row.created_at),
+    updatedAt: stringFrom(row.updated_at),
+  };
+}
+
+function normalizeIssueStatus(value: unknown): ErrorIssueStatus {
+  const status = stringFrom(value);
+  return status === "in_progress" || status === "resolved" || status === "ignored"
+    ? status
+    : "unresolved";
 }
 
 function recordFrom(value: unknown): Record<string, unknown> {

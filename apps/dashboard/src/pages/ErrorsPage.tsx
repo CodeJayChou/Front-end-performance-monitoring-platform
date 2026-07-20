@@ -26,7 +26,7 @@ export function ErrorsPage() {
       <section className="panel">
         {state.loading ? <LoadingState /> : state.error ? <ErrorState error={state.error} onRetry={refresh} /> : state.data?.items.length ? <>
           <div className="table-wrap"><table><thead><tr><th>错误</th><th>位置</th><th>影响范围</th><th>首次 / 最近</th><th>次数</th></tr></thead><tbody>{state.data.items.map((error) => <tr key={error.fingerprint}>
-            <td><Link className="primary-link" to={{ pathname: `/errors/${encodeURIComponent(error.fingerprint)}`, search: location.search }}>{error.title || "未命名错误"}</Link><small>{error.kind} · {error.fingerprint.slice(0, 12)}</small></td>
+            <td><Link className="primary-link" to={{ pathname: `/errors/${encodeURIComponent(error.fingerprint)}`, search: location.search }}>{error.title || "未命名错误"}</Link><small>{error.kind} · {error.fingerprint.slice(0, 12)}</small><div className="badge-row"><Badge tone={error.status === "resolved" ? "good" : error.status === "ignored" ? "neutral" : "danger"}>{error.status === "resolved" ? "已解决" : error.status === "in_progress" ? "处理中" : error.status === "ignored" ? "已忽略" : "未解决"}</Badge>{error.regressionCount > 0 ? <Badge tone="warning">回归 {error.regressionCount}</Badge> : null}</div></td>
             <td>{error.culprit || "—"}</td>
             <td><div className="badge-row">{error.environments.map((item) => <Badge key={item}>{item}</Badge>)}{error.platforms.map((item) => <Badge key={item}>{item}</Badge>)}</div></td>
             <td><small>{formatDate(error.firstSeen)}</small><br />{formatDate(error.lastSeen)}</td>

@@ -8,6 +8,7 @@ const links = [
   { to: "/errors", label: "错误", mark: "E" },
   { to: "/events", label: "事件", mark: "R" },
   { to: "/alerts", label: "告警", mark: "A" },
+  { to: "/source-maps", label: "映射", mark: "S" },
 ];
 
 export function AppLayout() {

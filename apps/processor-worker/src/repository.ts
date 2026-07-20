@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
-import type { ClaimedEvent, EventAnalysis } from "./types";
+import { SourceMapSymbolicator } from "./symbolicate";
+import type { ClaimedEvent, EventAnalysis, SymbolicationResult } from "./types";
 
 interface ClaimedRow {
   id: string;
@@ -16,7 +17,15 @@ interface ClaimedRow {
 }
 
 export class ProcessorRepository {
-  constructor(private readonly pool: Pool) {}
+  private readonly symbolicator: SourceMapSymbolicator;
+
+  constructor(private readonly pool: Pool) {
+    this.symbolicator = new SourceMapSymbolicator(pool);
+  }
+
+  symbolicate(event: ClaimedEvent): Promise<SymbolicationResult> {
+    return this.symbolicator.symbolicate(event);
+  }
 
   async claimBatch(limit: number, staleAfterMs: number): Promise<ClaimedEvent[]> {
     const result = await this.pool.query<ClaimedRow>(
@@ -45,19 +54,32 @@ export class ProcessorRepository {
     return result.rows.map(toClaimedEvent);
   }
 
-  async complete(event: ClaimedEvent, analysis: EventAnalysis): Promise<void> {
+  async complete(
+    event: ClaimedEvent,
+    analysis: EventAnalysis,
+    symbolication: SymbolicationResult = { status: "not_attempted", stack: null },
+  ): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      if (analysis?.type === "error") await upsertErrorGroup(client, event, analysis);
+      if (analysis?.type === "error") {
+        await upsertErrorGroup(client, event, analysis, symbolication);
+        await upsertErrorIssue(client, event, analysis.fingerprint);
+      }
       if (analysis?.type === "metric") await upsertMetricBucket(client, event, analysis);
       await client.query(
         `UPDATE events
          SET processing_status = 'processed', processed_at = now(),
              processing_started_at = NULL, processing_error = NULL,
-             error_fingerprint = $2
+             error_fingerprint = $2, symbolication_status = $3,
+             symbolicated_stack = $4
          WHERE id = $1 AND processing_status = 'processing'`,
-        [event.id, analysis?.type === "error" ? analysis.fingerprint : null],
+        [
+          event.id,
+          analysis?.type === "error" ? analysis.fingerprint : null,
+          symbolication.status,
+          symbolication.stack ? JSON.stringify(symbolication.stack) : null,
+        ],
       );
       await client.query("DELETE FROM processor_failures WHERE event_row_id = $1", [event.id]);
       await client.query("COMMIT");
@@ -104,7 +126,12 @@ async function upsertErrorGroup(
   client: PoolClient,
   event: ClaimedEvent,
   analysis: NonNullable<EventAnalysis> & { type: "error" },
+  symbolication: SymbolicationResult,
 ): Promise<void> {
+  const originalCulprit = symbolication.stack?.find((frame) => frame.inApp) ?? symbolication.stack?.[0];
+  const culprit = originalCulprit
+    ? `${originalCulprit.originalFile}:${originalCulprit.originalLine}:${originalCulprit.originalFunctionName ?? "anonymous"}`.slice(0, 1_000)
+    : analysis.culprit;
   await client.query(
     `INSERT INTO error_groups (
        project_id, environment, release, platform, fingerprint, kind, title, culprit,
@@ -130,11 +157,58 @@ async function upsertErrorGroup(
       analysis.fingerprint,
       analysis.kind,
       analysis.title,
-      analysis.culprit,
+      culprit,
       event.eventTimestamp,
       event.id,
     ],
   );
+}
+
+async function upsertErrorIssue(
+  client: PoolClient,
+  event: ClaimedEvent,
+  fingerprint: string,
+): Promise<void> {
+  const inserted = await client.query(
+    `INSERT INTO error_issues (project_id, fingerprint)
+     VALUES ($1, $2)
+     ON CONFLICT (project_id, fingerprint) DO NOTHING`,
+    [event.projectId, fingerprint],
+  );
+  if (inserted.rowCount === 1) {
+    await client.query(
+      `INSERT INTO error_issue_history (project_id, fingerprint, action, to_status)
+       VALUES ($1, $2, 'created', 'unresolved')`,
+      [event.projectId, fingerprint],
+    );
+  }
+
+  const issue = await client.query<{ status: string; resolved_at: Date | null }>(
+    `SELECT status, resolved_at FROM error_issues
+     WHERE project_id = $1 AND fingerprint = $2 FOR UPDATE`,
+    [event.projectId, fingerprint],
+  );
+  const current = issue.rows[0];
+  if (
+    current?.status === "resolved" &&
+    current.resolved_at &&
+    event.eventTimestamp > current.resolved_at
+  ) {
+    await client.query(
+      `UPDATE error_issues
+       SET status = 'unresolved', resolved_at = NULL,
+           last_regressed_at = $3, regression_count = regression_count + 1,
+           updated_at = now()
+       WHERE project_id = $1 AND fingerprint = $2`,
+      [event.projectId, fingerprint, event.eventTimestamp],
+    );
+    await client.query(
+      `INSERT INTO error_issue_history (
+         project_id, fingerprint, action, from_status, to_status, note, created_at
+       ) VALUES ($1, $2, 'regressed', 'resolved', 'unresolved', '检测到解决后的新事件', $3)`,
+      [event.projectId, fingerprint, event.eventTimestamp],
+    );
+  }
 }
 
 async function upsertMetricBucket(

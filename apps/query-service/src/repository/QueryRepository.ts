@@ -138,7 +138,11 @@ export class QueryRepository {
        LIMIT $${limitIndex} OFFSET $${offsetIndex}`,
       sql.values,
     );
-    return { total: count.rows[0]?.total ?? "0", items: result.rows };
+    const issues = await this.issuesByFingerprint(projectId, result.rows.map((row) => String(row.fingerprint)));
+    return {
+      total: count.rows[0]?.total ?? "0",
+      items: result.rows.map((row) => ({ ...row, ...issueFields(issues.get(String(row.fingerprint))) })),
+    };
   }
 
   async errorDetail(
@@ -167,13 +171,31 @@ export class QueryRepository {
     const offsetIndex = events.values.push(filters.offset);
     const samples = await this.pool.query(
       `SELECT event_id, event_timestamp, session_id, environment, release,
-              platform, context, payload
+              platform, context, payload, symbolication_status, symbolicated_stack
        FROM events WHERE ${events.clause}
        ORDER BY event_timestamp DESC, id DESC
        LIMIT $${limitIndex} OFFSET $${offsetIndex}`,
       events.values,
     );
-    return { group: group.rows[0], events: samples.rows };
+    const [issueResult, historyResult] = await Promise.all([
+      this.pool.query(
+        `SELECT status, note, resolved_at, last_regressed_at, regression_count, updated_at
+         FROM error_issues WHERE project_id = $1 AND fingerprint = $2`,
+        [projectId, fingerprint],
+      ),
+      this.pool.query(
+        `SELECT id, action, from_status, to_status, note, created_at
+         FROM error_issue_history
+         WHERE project_id = $1 AND fingerprint = $2
+         ORDER BY created_at DESC, id DESC LIMIT 50`,
+        [projectId, fingerprint],
+      ),
+    ]);
+    return {
+      group: { ...group.rows[0], ...issueFields(issueResult.rows[0]) },
+      events: samples.rows,
+      history: historyResult.rows,
+    };
   }
 
   async events(projectId: string, filters: QueryFilters): Promise<unknown> {
@@ -187,7 +209,7 @@ export class QueryRepository {
     const result = await this.pool.query(
       `SELECT event_id, schema_version, type, event_timestamp, received_at,
               session_id, environment, release, platform, sdk, trace, context,
-              payload, processing_status
+              payload, processing_status, symbolication_status, symbolicated_stack
        FROM events WHERE ${sql.clause}
        ORDER BY event_timestamp DESC, id DESC
        LIMIT $${limitIndex} OFFSET $${offsetIndex}`,
@@ -209,6 +231,32 @@ export class QueryRepository {
     );
     return result.rows;
   }
+
+  private async issuesByFingerprint(
+    projectId: string,
+    fingerprints: string[],
+  ): Promise<Map<string, Record<string, unknown>>> {
+    if (!fingerprints.length) return new Map();
+    const result = await this.pool.query(
+      `SELECT fingerprint, status, note, resolved_at, last_regressed_at,
+              regression_count, updated_at
+       FROM error_issues
+       WHERE project_id = $1 AND fingerprint = ANY($2::text[])`,
+      [projectId, fingerprints],
+    );
+    return new Map(result.rows.map((row) => [String(row.fingerprint), row]));
+  }
+}
+
+function issueFields(issue: Record<string, unknown> | undefined): Record<string, unknown> {
+  return issue ?? {
+    status: "unresolved",
+    note: null,
+    resolved_at: null,
+    last_regressed_at: null,
+    regression_count: 0,
+    updated_at: null,
+  };
 }
 
 function eventFilter(projectId: string, filters: QueryFilters): SqlFilter {

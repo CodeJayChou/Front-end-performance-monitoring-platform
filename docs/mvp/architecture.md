@@ -7,6 +7,8 @@ demo-web → sdk-web → BatchHttpTransport → ingest-gateway → events
                                                            ↓
                                                    processor-worker
                                                    ├─ error_groups
+                                                   ├─ error_issues/history
+                                                   ├─ source_maps → symbolicated stack
                                                    └─ metric_buckets_1m
                                                            ↓
                                                     query-service
@@ -34,6 +36,10 @@ The transport captures the original fetch function before Web integrations patch
 The processor claims pending or stale events with `FOR UPDATE SKIP LOCKED`. This allows multiple worker instances without a separate queue. Each event is completed in its own transaction:
 
 - error events receive a SHA-256 fingerprint based on kind, normalized title and culprit;
+- error stack frames are matched to Source Maps by project, release and generated
+  artifact path; resolved source positions and source lines are stored with the event;
+- every fingerprint has an issue state and audit history; a post-resolution event
+  automatically reopens the issue as a regression;
 - Web Vitals are aggregated into one-minute rating buckets;
 - performance buckets retain the `context.tags.scenario` dimension, without
   overloading the release field;

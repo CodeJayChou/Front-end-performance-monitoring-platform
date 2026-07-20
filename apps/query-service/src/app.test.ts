@@ -26,6 +26,14 @@ function dependencies(authorized = true) {
       deleteRule: vi.fn().mockResolvedValue(true),
       incidents: vi.fn().mockResolvedValue({ total: "0", items: [] }),
     },
+    sourceMapRepository: {
+      list: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockResolvedValue({ id: "1" }),
+      delete: vi.fn().mockResolvedValue(true),
+    },
+    errorWorkflowRepository: {
+      update: vi.fn().mockResolvedValue({ status: "resolved" }),
+    },
   };
 }
 
@@ -107,6 +115,41 @@ describe("query service", () => {
     expect(deps.alertRepository.createRule).toHaveBeenCalledWith(
       "demo-project",
       expect.objectContaining({ metric: "LCP", threshold: 2500 }),
+    );
+  });
+
+  it("uploads source maps and changes issue status", async () => {
+    const deps = dependencies();
+    const app = createApp(loadConfig({}), deps);
+    apps.push(app);
+    const headers = { authorization: "Bearer demo-admin-key" };
+    const uploaded = await app.inject({
+      method: "POST",
+      url: "/api/v1/projects/demo-project/source-maps",
+      headers,
+      payload: {
+        release: "demo@1.0.0",
+        artifactName: "assets/app.js",
+        sourceMap: { version: 3, names: [], sources: ["src/app.ts"], mappings: "AAAA" },
+      },
+    });
+    expect(uploaded.statusCode).toBe(201);
+    expect(deps.sourceMapRepository.upsert).toHaveBeenCalledWith(
+      "demo-project",
+      expect.objectContaining({ artifactName: "assets/app.js", sourceCount: 1 }),
+    );
+
+    const updated = await app.inject({
+      method: "PATCH",
+      url: "/api/v1/projects/demo-project/errors/fingerprint/status",
+      headers,
+      payload: { status: "resolved", note: "fixed" },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(deps.errorWorkflowRepository.update).toHaveBeenCalledWith(
+      "demo-project",
+      "fingerprint",
+      { status: "resolved", note: "fixed" },
     );
   });
 });

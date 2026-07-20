@@ -1,11 +1,11 @@
 import { analyzeEvent } from "./analyze";
 import type { ProcessorConfig } from "./config";
 import type { ProcessorRepository } from "./repository";
+import type { SymbolicationResult } from "./types";
 
-export type ProcessorStore = Pick<
-  ProcessorRepository,
-  "claimBatch" | "complete" | "recordFailure"
->;
+export type ProcessorStore = Pick<ProcessorRepository, "claimBatch" | "complete" | "recordFailure"> & {
+  symbolicate?: (event: Parameters<ProcessorRepository["complete"]>[0]) => Promise<SymbolicationResult>;
+};
 
 export class EventProcessor {
   constructor(
@@ -20,7 +20,13 @@ export class EventProcessor {
     );
     for (const event of events) {
       try {
-        await this.repository.complete(event, analyzeEvent(event.type, event.payload));
+        const analysis = analyzeEvent(event.type, event.payload);
+        if (this.repository.symbolicate) {
+          const symbolication = await this.repository.symbolicate(event);
+          await this.repository.complete(event, analysis, symbolication);
+        } else {
+          await this.repository.complete(event, analysis);
+        }
       } catch (error) {
         await this.repository.recordFailure(event, error, this.config.maxAttempts);
       }

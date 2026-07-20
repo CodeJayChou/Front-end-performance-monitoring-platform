@@ -7,6 +7,9 @@ const fromRoot = (p: string): string =>
   fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig({
+  build: {
+    sourcemap: true,
+  },
   resolve: {
     alias: {
       "@monitor/event-contract": fromRoot(

@@ -28,3 +28,30 @@ export interface MetricAnalysis {
 }
 
 export type EventAnalysis = ErrorAnalysis | MetricAnalysis | null;
+
+export type SymbolicationStatus =
+  | "not_attempted"
+  | "no_stack"
+  | "no_release"
+  | "map_not_found"
+  | "symbolicated"
+  | "failed";
+
+export interface SymbolicatedFrame {
+  file?: string;
+  line?: number;
+  col?: number;
+  functionName?: string;
+  raw?: string;
+  originalFile: string;
+  originalLine: number;
+  originalCol: number;
+  originalFunctionName?: string;
+  sourceLine?: string;
+  inApp: boolean;
+}
+
+export interface SymbolicationResult {
+  status: SymbolicationStatus;
+  stack: SymbolicatedFrame[] | null;
+}

@@ -67,6 +67,26 @@ export interface ErrorGroup {
   environments: string[];
   releases: string[];
   platforms: string[];
+  status: ErrorIssueStatus;
+  note: string | null;
+  resolvedAt: string | null;
+  lastRegressedAt: string | null;
+  regressionCount: number;
+}
+
+export type ErrorIssueStatus = "unresolved" | "in_progress" | "resolved" | "ignored";
+
+export interface SymbolicatedFrame {
+  file?: string;
+  line?: number;
+  col?: number;
+  functionName?: string;
+  originalFile: string;
+  originalLine: number;
+  originalCol: number;
+  originalFunctionName?: string;
+  sourceLine?: string;
+  inApp: boolean;
 }
 
 export interface EventRecord {
@@ -84,11 +104,41 @@ export interface EventRecord {
   context: unknown;
   payload: unknown;
   processingStatus?: string;
+  symbolicationStatus?: string;
+  symbolicatedStack: SymbolicatedFrame[];
 }
 
 export interface ErrorDetail {
   group: ErrorGroup;
   events: EventRecord[];
+  history: ErrorIssueHistory[];
+}
+
+export interface ErrorIssueHistory {
+  id: string;
+  action: string;
+  fromStatus: string | null;
+  toStatus: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface SourceMapArtifact {
+  id: string;
+  release: string;
+  dist: string;
+  artifactName: string;
+  contentHash: string;
+  sourceCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SourceMapUpload {
+  release: string;
+  dist?: string;
+  artifactName: string;
+  sourceMap: Record<string, unknown>;
 }
 
 export interface ReleaseSummary {
