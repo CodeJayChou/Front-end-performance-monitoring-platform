@@ -23,6 +23,7 @@
     "mvp:cleanup": "pnpm --filter @monitor/ingest-gateway db:cleanup",
     "dashboard:dev": "pnpm --filter @monitor/dashboard dev",
     "dashboard:test": "pnpm --filter @monitor/dashboard test",
+    "demo:browser": "pnpm --filter @monitor/demo-web dev:browser",
     "clean": "turbo run clean"
   },
   "devDependencies": {

@@ -2,13 +2,16 @@ import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { Pool } from "pg";
 import type { QueryConfig } from "./config";
+import { parseCreateAlertRule, parseEnabled } from "./alerts";
 import { parseFilters } from "./filters";
+import { AlertRepository } from "./repository/AlertRepository";
 import { AdminProjectRepository } from "./repository/AdminProjectRepository";
 import { QueryRepository } from "./repository/QueryRepository";
 
 interface RouteParams {
   projectId: string;
   fingerprint?: string;
+  ruleId?: string;
 }
 
 type RouteQuery = Record<string, string | undefined>;
@@ -20,6 +23,10 @@ export interface QueryAppDependencies {
     QueryRepository,
     "overview" | "performanceSeries" | "errors" | "errorDetail" | "events" | "releases"
   >;
+  alertRepository?: Pick<
+    AlertRepository,
+    "listRules" | "createRule" | "setEnabled" | "deleteRule" | "incidents"
+  >;
 }
 
 export function createApp(
@@ -30,8 +37,9 @@ export function createApp(
   const pool = dependencies.pool ?? new Pool({ connectionString: config.databaseUrl });
   const adminRepository = dependencies.adminRepository ?? new AdminProjectRepository(pool);
   const queryRepository = dependencies.queryRepository ?? new QueryRepository(pool);
+  const alertRepository = dependencies.alertRepository ?? new AlertRepository(pool);
 
-  void app.register(cors, { origin: true, methods: ["GET", "OPTIONS"] });
+  void app.register(cors, { origin: true, methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"] });
   app.get("/health", async () => ({ status: "ok" }));
   app.get("/ready", async (_request, reply) => {
     try {
@@ -49,6 +57,62 @@ export function createApp(
       const parsed = parseFilters(request.query, config);
       if (!parsed.ok) return reply.code(400).send({ error: parsed.reason });
       return queryRepository.overview(request.params.projectId, parsed.filters);
+    },
+  );
+
+  app.get<{ Params: RouteParams }>(
+    "/api/v1/projects/:projectId/alert-rules",
+    async (request, reply) => {
+      if (!(await authorize(request, adminRepository))) return reply.code(401).send({ error: "unauthorized" });
+      return { items: await alertRepository.listRules(request.params.projectId) };
+    },
+  );
+
+  app.post<{ Params: RouteParams; Body: unknown }>(
+    "/api/v1/projects/:projectId/alert-rules",
+    async (request, reply) => {
+      if (!(await authorize(request, adminRepository))) return reply.code(401).send({ error: "unauthorized" });
+      const parsed = parseCreateAlertRule(request.body);
+      if (!parsed.ok) return reply.code(400).send({ error: parsed.reason });
+      const rule = await alertRepository.createRule(request.params.projectId, parsed.value);
+      return reply.code(201).send(rule);
+    },
+  );
+
+  app.patch<{ Params: RouteParams; Body: unknown }>(
+    "/api/v1/projects/:projectId/alert-rules/:ruleId",
+    async (request, reply) => {
+      if (!(await authorize(request, adminRepository))) return reply.code(401).send({ error: "unauthorized" });
+      const enabled = parseEnabled(request.body);
+      if (enabled === null) return reply.code(400).send({ error: "invalid_alert_update" });
+      const rule = await alertRepository.setEnabled(
+        request.params.projectId,
+        request.params.ruleId ?? "",
+        enabled,
+      );
+      return rule ?? reply.code(404).send({ error: "alert_rule_not_found" });
+    },
+  );
+
+  app.delete<{ Params: RouteParams }>(
+    "/api/v1/projects/:projectId/alert-rules/:ruleId",
+    async (request, reply) => {
+      if (!(await authorize(request, adminRepository))) return reply.code(401).send({ error: "unauthorized" });
+      const deleted = await alertRepository.deleteRule(
+        request.params.projectId,
+        request.params.ruleId ?? "",
+      );
+      return deleted ? reply.code(204).send() : reply.code(404).send({ error: "alert_rule_not_found" });
+    },
+  );
+
+  app.get<{ Params: RouteParams; Querystring: RouteQuery }>(
+    "/api/v1/projects/:projectId/alert-incidents",
+    async (request, reply) => {
+      if (!(await authorize(request, adminRepository))) return reply.code(401).send({ error: "unauthorized" });
+      const parsed = parseFilters(request.query, config);
+      if (!parsed.ok) return reply.code(400).send({ error: parsed.reason });
+      return alertRepository.incidents(request.params.projectId, parsed.filters);
     },
   );
 

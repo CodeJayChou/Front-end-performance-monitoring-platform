@@ -7,6 +7,7 @@ const links = [
   { to: "/performance", label: "性能", mark: "P" },
   { to: "/errors", label: "错误", mark: "E" },
   { to: "/events", label: "事件", mark: "R" },
+  { to: "/alerts", label: "告警", mark: "A" },
 ];
 
 export function AppLayout() {

@@ -45,7 +45,15 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.0)(jsdom@29.1.1)
 
-  apps/alert-worker: {}
+  apps/alert-worker:
+    dependencies:
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
 
   apps/dashboard:
     dependencies:

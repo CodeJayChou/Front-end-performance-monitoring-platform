@@ -10,6 +10,8 @@ demo-web → sdk-web → BatchHttpTransport → ingest-gateway → events
                                                    └─ metric_buckets_1m
                                                            ↓
                                                     query-service
+                                                           ↓
+                                      alert-worker → incidents → Webhook
 ```
 
 ## SDK flow
@@ -44,6 +46,18 @@ The processor claims pending or stale events with `FOR UPDATE SKIP LOCKED`. This
 - stale `processing` events are reclaimed after a timeout.
 
 PostgreSQL remains the MVP queue and analytics store. Kafka or ClickHouse should only be introduced after measured volume or query latency requires them.
+
+## Alerting flow
+
+Alert rules evaluate completed, aligned time windows so worker polling cannot
+increment consecutive-breach counters more than once per period. Rules support
+processed error counts and raw-event P75 performance thresholds, optional
+environment/release/platform scopes, consecutive periods and cooldowns. A
+firing incident resolves automatically when the next evaluated value recovers.
+Disabling a firing rule also resolves its current incident and emits one
+recovery delivery when a webhook is configured.
+Webhook deliveries are claimed with `SKIP LOCKED`, retried with exponential
+backoff and retained with their final delivery status.
 
 The Web batch transport retries transient failures, puts an exhausted batch
 back at the front of its in-memory queue, and flushes on page hide. A

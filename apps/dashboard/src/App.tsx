@@ -10,6 +10,7 @@ const PerformancePage = lazy(() => import("./pages/PerformancePage").then((modul
 const ErrorsPage = lazy(() => import("./pages/ErrorsPage").then((module) => ({ default: module.ErrorsPage })));
 const ErrorDetailPage = lazy(() => import("./pages/ErrorDetailPage").then((module) => ({ default: module.ErrorDetailPage })));
 const EventsPage = lazy(() => import("./pages/EventsPage").then((module) => ({ default: module.EventsPage })));
+const AlertsPage = lazy(() => import("./pages/AlertsPage").then((module) => ({ default: module.AlertsPage })));
 
 export function App() {
   return (
@@ -23,6 +24,7 @@ export function App() {
             <Route path="/errors" element={<ErrorsPage />} />
             <Route path="/errors/:fingerprint" element={<ErrorDetailPage />} />
             <Route path="/events" element={<EventsPage />} />
+            <Route path="/alerts" element={<AlertsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/overview" replace />} />
         </Routes>

@@ -357,6 +357,58 @@ on("lcp-fast", () => reloadScenario("slow-lcp", 250));
 on("lcp-slow", () => reloadScenario("slow-lcp", 4_500));
 on("fcp-slow", () => reloadScenario("blocked-fcp"));
 
+type AlertValidationKind = "errors" | "lcp" | "inp";
+
+async function sendAlertValidationBatch(kind: AlertValidationKind): Promise<void> {
+  const status = document.getElementById("alert-status")!;
+  const buttons = document.querySelectorAll<HTMLButtonElement>("[data-alert-action]");
+  const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  buttons.forEach((button) => { button.disabled = true; });
+  status.className = "alert-status";
+  status.textContent = "正在生成事件并刷新 SDK 批量队列…";
+
+  try {
+    const captures = Array.from({ length: 5 }, (_, index) => {
+      if (kind === "errors") {
+        const error = new Error(`alert validation error ${runId}-${index + 1}`);
+        return client.capture(createEvent("error", {
+          kind: "js",
+          message: error.message,
+          source: `${location.origin}/alert-validation.js`,
+          lineno: index + 1,
+          colno: 1,
+          stack: error.stack,
+        }, client.platform));
+      }
+      const metric = kind === "lcp" ? "LCP" : "INP";
+      const value = kind === "lcp" ? 5_000 + index : 650 + index;
+      return client.capture(createEvent("performance", {
+        metric,
+        value,
+        rating: "poor",
+        source: "alert-validation",
+        runId,
+      }, client.platform));
+    });
+    await Promise.all(captures);
+    await client.flush();
+    const label = kind === "errors" ? "5 条错误" : kind === "lcp" ? "5 条 LCP 5000ms" : "5 条 INP 650ms";
+    status.className = "alert-status success";
+    status.textContent = `${label}已发送（批次 ${runId}）。请等待完整分钟结束，再到告警中心查看触发结果。`;
+    console.log(`[alert-lab] ${label} sent and flushed, runId=${runId}`);
+  } catch (error) {
+    status.className = "alert-status error";
+    status.textContent = `发送失败：${error instanceof Error ? error.message : String(error)}`;
+    console.log("[alert-lab] validation batch failed", error);
+  } finally {
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
+on("alert-errors", () => { void sendAlertValidationBatch("errors"); });
+on("alert-lcp", () => { void sendAlertValidationBatch("lcp"); });
+on("alert-inp", () => { void sendAlertValidationBatch("inp"); });
+
 // 清空面板
 on("clear", () => {
   panel.replaceChildren();

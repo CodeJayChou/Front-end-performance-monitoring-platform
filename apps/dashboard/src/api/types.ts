@@ -102,3 +102,57 @@ export interface PageResult<T> {
   total: number;
   items: T[];
 }
+
+export type AlertRuleType = "error_count" | "performance_p75";
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  type: AlertRuleType;
+  metric: string | null;
+  threshold: number;
+  windowMinutes: number;
+  consecutivePeriods: number;
+  cooldownMinutes: number;
+  environment: string | null;
+  release: string | null;
+  platform: string | null;
+  webhookUrl: string | null;
+  enabled: boolean;
+  status: "ok" | "firing";
+  consecutiveBreaches: number;
+  lastValue: number | null;
+  lastEvaluatedAt: string | null;
+  lastTriggeredAt: string | null;
+}
+
+export interface CreateAlertRule {
+  name: string;
+  type: AlertRuleType;
+  metric?: string;
+  threshold: number;
+  windowMinutes: number;
+  consecutivePeriods: number;
+  cooldownMinutes: number;
+  environment?: string;
+  release?: string;
+  platform?: string;
+  webhookUrl?: string;
+  enabled?: boolean;
+}
+
+export interface AlertIncident {
+  id: string;
+  status: "firing" | "resolved";
+  startedAt: string;
+  resolvedAt: string | null;
+  triggerValue: number;
+  lastValue: number;
+  windowStart: string;
+  windowEnd: string;
+  ruleId: string;
+  ruleName: string;
+  ruleType: AlertRuleType;
+  metric: string | null;
+  threshold: number;
+}

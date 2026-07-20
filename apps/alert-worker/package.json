@@ -9,5 +9,11 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist .turbo"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10"
   }
 }

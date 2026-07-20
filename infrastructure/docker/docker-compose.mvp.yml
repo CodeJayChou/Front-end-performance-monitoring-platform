@@ -62,6 +62,18 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  alert-worker:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.mvp
+    command: ["pnpm", "--filter", "@monitor/alert-worker", "start"]
+    environment:
+      DATABASE_URL: postgres://monitor:monitor@postgres:5432/monitor
+      ALERT_POLL_INTERVAL_MS: "30000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   query-service:
     build:
       context: ../..

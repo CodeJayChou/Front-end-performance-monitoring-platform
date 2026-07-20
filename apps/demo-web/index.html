@@ -135,6 +135,49 @@
       }
       .perf-lab h2 { margin: 0 0 8px; font-size: 16px; }
       .perf-lab p { color: #888; margin: 0 0 12px; font-size: 13px; }
+      .alert-lab {
+        margin: 20px 0;
+        padding: 16px;
+        border: 1px solid #d8525e66;
+        border-radius: 10px;
+        background: #d8525e0d;
+      }
+      .alert-lab h2 { margin: 0 0 8px; font-size: 16px; }
+      .alert-lab > p { color: #888; margin: 0 0 12px; font-size: 13px; line-height: 1.6; }
+      .alert-presets { display: grid; gap: 7px; margin: 12px 0; }
+      .alert-preset {
+        display: grid;
+        grid-template-columns: minmax(120px, .8fr) minmax(0, 2fr);
+        gap: 10px;
+        padding: 9px 11px;
+        border: 1px solid #8883;
+        border-radius: 7px;
+        font-size: 12px;
+      }
+      .alert-preset strong { color: #d8525e; }
+      .alert-preset code { overflow-wrap: anywhere; }
+      .alert-btn { background: #d8525e1f; border-color: #d8525e66; }
+      .alert-btn:hover { background: #d8525e38; }
+      .dashboard-link {
+        display: inline-flex;
+        align-items: center;
+        padding: 10px 16px;
+        border: 1px solid #8884;
+        border-radius: 8px;
+        color: inherit;
+        background: #6b8afd22;
+        font-size: 14px;
+        text-decoration: none;
+      }
+      .dashboard-link:hover { background: #6b8afd44; }
+      .alert-status {
+        min-height: 20px;
+        margin: 10px 0 0;
+        color: #9fb5d4;
+        font-size: 13px;
+      }
+      .alert-status.success { color: #20a777; }
+      .alert-status.error { color: #d8525e; }
       .scenario-hero {
         margin: 16px 0;
         overflow: hidden;
@@ -246,6 +289,26 @@
             <button id="lcp-slow">刷新：慢 LCP (&gt;4s)</button>
             <button id="fcp-slow">刷新：阻塞 FCP</button>
           </div>
+        </section>
+
+        <section class="alert-lab" aria-labelledby="alert-lab-title">
+          <h2 id="alert-lab-title">Alert Lab：触发告警验证规则</h2>
+          <p>
+            先在 Dashboard 创建对应规则，再点击按钮。验证事件会批量经过真实 SDK 上报链路并立即刷新发送队列；
+            告警按完整分钟窗口计算，通常需要等待当前分钟结束及下一次 Worker 轮询。
+          </p>
+          <div class="alert-presets">
+            <div class="alert-preset"><strong>错误数量规则</strong><code>错误数量 ≥ 5 · 窗口 1 分钟 · 连续 1 · development / web</code></div>
+            <div class="alert-preset"><strong>LCP P75 规则</strong><code>LCP P75 ≥ 4000ms · 窗口 1 分钟 · 连续 1 · development / web</code></div>
+            <div class="alert-preset"><strong>INP P75 规则</strong><code>INP P75 ≥ 500ms · 窗口 1 分钟 · 连续 1 · development / web</code></div>
+          </div>
+          <div class="btns">
+            <button id="alert-errors" class="alert-btn" data-alert-action>上报 5 条验证错误</button>
+            <button id="alert-lcp" class="alert-btn" data-alert-action>上报 5 条 LCP 5000ms</button>
+            <button id="alert-inp" class="alert-btn" data-alert-action>上报 5 条 INP 650ms</button>
+            <a class="dashboard-link" href="http://localhost:5174/alerts" target="_blank" rel="noreferrer">打开告警中心</a>
+          </div>
+          <p id="alert-status" class="alert-status" role="status" aria-live="polite">等待触发验证事件。</p>
         </section>
 
       </main>

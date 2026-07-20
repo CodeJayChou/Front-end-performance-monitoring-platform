@@ -19,6 +19,13 @@ function dependencies(authorized = true) {
       events: vi.fn().mockResolvedValue({ total: "0", items: [] }),
       releases: vi.fn().mockResolvedValue([]),
     },
+    alertRepository: {
+      listRules: vi.fn().mockResolvedValue([]),
+      createRule: vi.fn().mockImplementation(async (_projectId, input) => ({ id: "1", ...input })),
+      setEnabled: vi.fn().mockResolvedValue({ id: "1", enabled: false }),
+      deleteRule: vi.fn().mockResolvedValue(true),
+      incidents: vi.fn().mockResolvedValue({ total: "0", items: [] }),
+    },
   };
 }
 
@@ -66,5 +73,40 @@ describe("query service", () => {
       headers,
     });
     expect(missing.statusCode).toBe(404);
+  });
+
+  it("validates and creates project-scoped alert rules", async () => {
+    const deps = dependencies();
+    const app = createApp(loadConfig({}), deps);
+    apps.push(app);
+    const headers = { authorization: "Bearer demo-admin-key" };
+
+    const invalid = await app.inject({
+      method: "POST",
+      url: "/api/v1/projects/demo-project/alert-rules",
+      headers,
+      payload: { name: "LCP", type: "performance_p75", threshold: 2500 },
+    });
+    expect(invalid.statusCode).toBe(400);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/projects/demo-project/alert-rules",
+      headers,
+      payload: {
+        name: "LCP 过高",
+        type: "performance_p75",
+        metric: "LCP",
+        threshold: 2500,
+        windowMinutes: 5,
+        consecutivePeriods: 2,
+        cooldownMinutes: 15,
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(deps.alertRepository.createRule).toHaveBeenCalledWith(
+      "demo-project",
+      expect.objectContaining({ metric: "LCP", threshold: 2500 }),
+    );
   });
 });
