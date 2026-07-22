@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
+import { X } from "lucide-react";
 import type { EventRecord } from "../api/types";
-import { Badge, EmptyState, ErrorState, formatDate, LoadingState, PageHeader, Pagination } from "../components/Ui";
+import { AppIcon } from "../components/AppIcon";
+import { AsyncPage, TableSkeleton } from "../components/Loading";
+import { Badge, EmptyState, ErrorState, formatDate, PageHeader, Pagination } from "../components/Ui";
 import { JsonViewer } from "../components/JsonViewer";
 import { useDashboard } from "../state/DashboardContext";
 import { toApiFilters } from "../state/filters";
@@ -22,10 +25,10 @@ export function EventsPage() {
   );
 
   return (
-    <div className="page-stack">
+    <AsyncPage refreshing={state.refreshing} error={state.data ? state.error : null}>
       <PageHeader eyebrow="RAW EVENTS" title="事件流" description="查看服务端接收到的标准事件、上下文与处理状态。" />
       <section className="panel">
-        {state.loading ? <LoadingState /> : state.error ? <ErrorState error={state.error} onRetry={refresh} /> : state.data?.items.length ? <>
+        {state.loading ? <TableSkeleton columns={6} /> : state.error && !state.data ? <ErrorState error={state.error} onRetry={refresh} /> : state.data?.items.length ? <>
           <div className="table-wrap"><table><thead><tr><th>类型</th><th>时间</th><th>会话</th><th>环境 / 版本</th><th>处理状态</th><th /></tr></thead><tbody>{state.data.items.map((event) => <tr key={event.eventId}>
             <td><Badge tone={event.type === "error" ? "danger" : "neutral"}>{event.type ?? "unknown"}</Badge></td>
             <td>{formatDate(event.eventTimestamp)}</td><td><code>{event.sessionId.slice(0, 12)}</code></td>
@@ -37,12 +40,12 @@ export function EventsPage() {
         </> : <EmptyState title="当前范围没有事件" description="启动 demo-web 并触发事件后刷新本页。" />}
       </section>
       {selected ? <aside className="event-drawer" aria-label="事件详情">
-        <div className="drawer-heading"><div><span>{selected.type}</span><strong>{selected.eventId}</strong></div><button type="button" onClick={() => setSelected(null)} aria-label="关闭事件详情">×</button></div>
+        <div className="drawer-heading"><div><span>{selected.type}</span><strong>{selected.eventId}</strong></div><button type="button" onClick={() => setSelected(null)} aria-label="关闭事件详情"><AppIcon icon={X} size="sm" /></button></div>
         <dl><div><dt>发生时间</dt><dd>{formatDate(selected.eventTimestamp)}</dd></div><div><dt>平台</dt><dd>{selected.platform}</dd></div><div><dt>环境</dt><dd>{selected.environment}</dd></div><div><dt>版本</dt><dd>{selected.release ?? "—"}</dd></div></dl>
         <h3>Payload</h3><JsonViewer value={selected.payload} />
         <h3>Context</h3><JsonViewer value={selected.context} />
         {selected.trace ? <><h3>Trace</h3><JsonViewer value={selected.trace} /></> : null}
       </aside> : null}
-    </div>
+    </AsyncPage>
   );
 }

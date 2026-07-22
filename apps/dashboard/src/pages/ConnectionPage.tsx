@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
+import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { ConnectionConfig } from "../api/types";
+import { AppIcon } from "../components/AppIcon";
+import { BrandSignal } from "../components/BrandSignal";
 import { LoginMascots } from "../components/LoginMascots";
 import { useDashboard } from "../state/DashboardContext";
 
@@ -26,7 +29,7 @@ export function ConnectionPage() {
       <LoginMascots mode={activeField === "adminKey" && form.adminKey ? "secret" : activeField ? "typing" : "idle"} />
       <section className="connection-form-side">
         <form className="connection-login-form" onSubmit={submit}>
-          <div className="mobile-login-brand"><span className="brand-signal" aria-hidden="true"><span /></span><strong>Pulse</strong></div>
+          <div className="mobile-login-brand"><BrandSignal /><strong>Pulse</strong></div>
           <header>
             <h1>欢迎回来！</h1>
             <p>连接监控项目，继续查看前端运行状态</p>
@@ -43,8 +46,8 @@ export function ConnectionPage() {
             管理密钥
             <input type="password" value={form.adminKey} onFocus={() => setActiveField("adminKey")} onBlur={() => setActiveField(null)} onChange={(event) => setForm({ ...form, adminKey: event.target.value })} placeholder="请输入管理密钥" autoComplete="off" required />
           </label>
-          <button className="connection-submit" type="submit"><span>进入监控工作台</span><i aria-hidden="true">→</i></button>
-          <div className="connection-privacy"><span aria-hidden="true">⌁</span><p>管理密钥仅保存在当前浏览器会话，不会写入 URL 或 localStorage。</p></div>
+          <button className="connection-submit" type="submit"><span>进入监控工作台</span><AppIcon icon={ArrowRight} size="lg" /></button>
+          <div className="connection-privacy"><p>管理密钥仅保存在当前浏览器会话，不会写入 URL 或 localStorage。</p></div>
         </form>
       </section>
     </main>

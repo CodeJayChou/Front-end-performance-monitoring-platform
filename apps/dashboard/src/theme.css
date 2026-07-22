@@ -20,6 +20,11 @@
   --ui-text-title-sm: 1.125rem;
   --ui-text-title: 1.5rem;
   --ui-text-display: 2rem;
+  --ui-icon-xs: 0.875rem;
+  --ui-icon-sm: 1rem;
+  --ui-icon-md: 1.125rem;
+  --ui-icon-lg: 1.25rem;
+  --ui-icon-xl: 1.5rem;
   --ui-leading-tight: 1.3;
   --ui-leading-snug: 1.45;
   --ui-leading-normal: 1.65;
@@ -148,6 +153,11 @@
   --spacing-ui-8: var(--ui-space-8);
   --spacing-ui-10: var(--ui-space-10);
   --spacing-ui-12: var(--ui-space-12);
+  --spacing-icon-xs: var(--ui-icon-xs);
+  --spacing-icon-sm: var(--ui-icon-sm);
+  --spacing-icon-md: var(--ui-icon-md);
+  --spacing-icon-lg: var(--ui-icon-lg);
+  --spacing-icon-xl: var(--ui-icon-xl);
 
   --radius-ui-xs: var(--ui-radius-xs);
   --radius-ui-sm: var(--ui-radius-sm);

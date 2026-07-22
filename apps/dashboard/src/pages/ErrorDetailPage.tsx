@@ -1,7 +1,11 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import type { ErrorGroup, ErrorIssueStatus, EventRecord, SymbolicatedFrame } from "../api/types";
-import { Badge, EmptyState, ErrorState, formatDate, LoadingState, PageHeader } from "../components/Ui";
+import { AppIcon } from "../components/AppIcon";
+import { FilterSelect } from "../components/FilterSelect";
+import { AsyncPage, ButtonLoadingContent, PageSkeleton } from "../components/Loading";
+import { Badge, EmptyState, ErrorState, formatDate, PageHeader } from "../components/Ui";
 import { JsonViewer } from "../components/JsonViewer";
 import { useDashboard } from "../state/DashboardContext";
 import { toApiFilters } from "../state/filters";
@@ -27,16 +31,16 @@ export function ErrorDetailPage() {
     [client, fingerprint, apiFilters.from, apiFilters.to, apiFilters.environment, apiFilters.release, apiFilters.platform, refreshKey],
   );
 
-  if (state.loading) return <LoadingState />;
-  if (state.error) return <ErrorState error={state.error} onRetry={refresh} />;
+  if (state.loading) return <PageSkeleton />;
+  if (state.error && !state.data) return <ErrorState error={state.error} onRetry={refresh} />;
   if (!state.data) return <EmptyState title="错误组不存在" description="它可能不在当前时间范围或筛选条件内。" />;
   const { group, events, history } = state.data;
   const stackEvent = events.find((event) => event.symbolicatedStack.length > 0) ?? events[0];
   const breadcrumbs = stackEvent ? breadcrumbsFrom(stackEvent.context) : [];
 
   return (
-    <div className="page-stack">
-      <Link className="back-link" to={{ pathname: "/errors", search: location.search }}>← 返回错误列表</Link>
+    <AsyncPage refreshing={state.refreshing} error={state.error}>
+      <Link className="back-link" to={{ pathname: "/errors", search: location.search }}><AppIcon icon={ArrowLeft} size="sm" />返回错误列表</Link>
       <PageHeader
         eyebrow={group.kind || "ERROR DETAIL"}
         title={group.title || "未命名错误"}
@@ -75,14 +79,14 @@ export function ErrorDetailPage() {
 
       <section className="panel">
         <div className="panel-heading"><div><span>WORKFLOW</span><h2>处置历史</h2></div></div>
-        {history.length ? <div className="issue-history">{history.map((item) => <div key={item.id}><span>{historyLabel(item.action)}</span><strong>{item.fromStatus ? statusLabel(item.fromStatus) : "—"} → {item.toStatus ? statusLabel(item.toStatus) : "—"}</strong><p>{item.note || "无备注"}</p><time>{formatDate(item.createdAt)}</time></div>)}</div> : <EmptyState title="暂无处置记录" description="更新状态或备注后，变更历史会显示在这里。" />}
+        {history.length ? <div className="issue-history">{history.map((item) => <div key={item.id}><span>{historyLabel(item.action)}</span><strong>{item.fromStatus ? statusLabel(item.fromStatus) : "—"}<AppIcon icon={ArrowRight} size="xs" />{item.toStatus ? statusLabel(item.toStatus) : "—"}</strong><p>{item.note || "无备注"}</p><time>{formatDate(item.createdAt)}</time></div>)}</div> : <EmptyState title="暂无处置记录" description="更新状态或备注后，变更历史会显示在这里。" />}
       </section>
 
       <section className="panel">
         <div className="panel-heading"><div><span>RECENT SAMPLES</span><h2>最近事件样本</h2></div></div>
         {events.length ? <div className="event-samples">{events.map((event) => <details key={event.eventId} className="event-sample"><summary><span>{formatDate(event.eventTimestamp)}</span><span>{event.environment} · {event.release ?? "no release"}</span><code>{event.eventId.slice(0, 12)}</code></summary><div className="json-grid"><div><h3>Payload</h3><JsonViewer value={event.payload} /></div><div><h3>Context</h3><JsonViewer value={event.context} /></div></div></details>)}</div> : <EmptyState title="暂无事件样本" description="该错误组在当前筛选条件下没有原始事件。" />}
       </section>
-    </div>
+    </AsyncPage>
   );
 }
 
@@ -108,7 +112,7 @@ function IssueControls({ group, fingerprint }: { group: ErrorGroup; fingerprint:
     }
   };
 
-  return <form className="issue-controls" onSubmit={submit}><select aria-label="错误状态" value={status} onChange={(event) => setStatus(event.target.value as ErrorIssueStatus)}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><input aria-label="处置备注" maxLength={2000} placeholder="添加处置备注" value={note} onChange={(event) => setNote(event.target.value)} /><button className="primary-button" type="submit" disabled={saving}>{saving ? "保存中…" : "更新状态"}</button>{error ? <span role="alert">{error}</span> : null}</form>;
+  return <form className="issue-controls" onSubmit={submit}><FilterSelect label="状态" value={status} options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))} variant="standalone" onChange={(value) => setStatus(value as ErrorIssueStatus)} /><input aria-label="处置备注" maxLength={2000} placeholder="添加处置备注" value={note} onChange={(event) => setNote(event.target.value)} /><button className="primary-button" type="submit" disabled={saving} aria-busy={saving}><ButtonLoadingContent loading={saving} loadingLabel="保存中…">更新状态</ButtonLoadingContent></button>{error ? <span role="alert">{error}</span> : null}</form>;
 }
 
 function SourceStack({ frames }: { frames: SymbolicatedFrame[] }) {

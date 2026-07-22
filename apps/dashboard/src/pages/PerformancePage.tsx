@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
 import type { EChartsCoreOption } from "echarts/core";
 import { EChart } from "../components/EChart";
-import { EmptyState, ErrorState, LoadingState, PageHeader } from "../components/Ui";
+import { FilterSelect } from "../components/FilterSelect";
+import { AsyncPage, ChartSkeleton } from "../components/Loading";
+import { EmptyState, ErrorState, PageHeader } from "../components/Ui";
 import { useDashboard } from "../state/DashboardContext";
 import { toApiFilters } from "../state/filters";
 import { useApiData } from "../state/useApiData";
 
 const metrics = ["LCP", "CLS", "INP", "FCP", "FP"];
+const metricOptions = metrics.map((value) => ({ value, label: value }));
 const scenarios = [
   { value: "", label: "全部场景" },
   { value: "default", label: "默认页面" },
@@ -71,11 +74,11 @@ export function PerformancePage() {
   }, [metric, state.data]);
 
   return (
-    <div className="page-stack">
+    <AsyncPage refreshing={state.refreshing} error={state.data ? state.error : null}>
       <PageHeader eyebrow="PERFORMANCE" title="真实用户性能" description="按一分钟聚合观察 Core Web Vitals 的变化与质量分布。" action={
         <div className="performance-selectors">
-          <label className="metric-select">场景<select value={scenario} onChange={(event) => setScenario(event.target.value)}>{scenarios.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-          <label className="metric-select">指标<select value={metric} onChange={(event) => setMetric(event.target.value)}>{metrics.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <FilterSelect label="场景" value={scenario} options={scenarios} variant="field" onChange={setScenario} />
+          <FilterSelect label="指标" value={metric} options={metricOptions} variant="field" onChange={setMetric} />
         </div>
       } />
       {!filters.release ? (
@@ -86,9 +89,9 @@ export function PerformancePage() {
       ) : null}
       <section className="panel chart-panel">
         <div className="panel-heading"><div><span>{metric} SERIES · {filters.release || "全部版本"}</span><h2>{metric} 时间趋势</h2></div></div>
-        {state.loading ? <LoadingState /> : state.error ? <ErrorState error={state.error} onRetry={refresh} /> : state.data?.length ? <EChart option={option} label={`${metric} 按 rating 分组的时间趋势`} /> : <EmptyState title={`暂无 ${metric} 数据`} description="运行浏览器演示并等待 Processor 完成聚合后再刷新。" />}
+        {state.loading ? <ChartSkeleton /> : state.error && !state.data ? <ErrorState error={state.error} onRetry={refresh} /> : state.data?.length ? <EChart option={option} label={`${metric} 按 rating 分组的时间趋势`} /> : <EmptyState title={`暂无 ${metric} 数据`} description="运行浏览器演示并等待 Processor 完成聚合后再刷新。" />}
       </section>
       {state.data?.length ? <section className="panel"><div className="panel-heading"><div><span>BUCKET DETAILS</span><h2>聚合明细</h2></div></div><div className="table-wrap"><table><thead><tr><th>时间</th><th>评级</th><th>P75</th><th>平均</th><th>最小</th><th>最大</th><th>样本</th></tr></thead><tbody>{state.data.slice(-50).reverse().map((point, index) => <tr key={`${point.bucketStart}-${point.rating}-${index}`}><td>{new Date(point.bucketStart).toLocaleString("zh-CN")}</td><td>{point.rating}</td><td>{point.p75 === null ? "—" : point.p75.toFixed(metric === "CLS" ? 3 : 0)}</td><td>{point.average.toFixed(metric === "CLS" ? 3 : 0)}</td><td>{point.minimum.toFixed(metric === "CLS" ? 3 : 0)}</td><td>{point.maximum.toFixed(metric === "CLS" ? 3 : 0)}</td><td>{point.sampleCount}</td></tr>)}</tbody></table></div></section> : null}
-    </div>
+    </AsyncPage>
   );
 }

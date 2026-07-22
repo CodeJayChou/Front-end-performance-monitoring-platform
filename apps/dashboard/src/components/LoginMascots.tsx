@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { BrandSignal } from "./BrandSignal";
 
 // Interaction concept adapted from gokuscraper/Eyes-Follow-Mouse-Login-Website
 // (Apache-2.0). Reimplemented as a React/CSS component for this dashboard.
@@ -39,12 +40,11 @@ export function LoginMascots({
       <div className="visual-glow visual-glow-one" aria-hidden="true" />
       <div className="visual-glow visual-glow-two" aria-hidden="true" />
       <div className="visual-brand">
-        <span className="brand-signal" aria-hidden="true"><span /></span>
+        <BrandSignal />
         <div><strong>Pulse</strong><small>Observability</small></div>
       </div>
       <div className="visual-copy">
-        <p>FRONTEND INTELLIGENCE</p>
-        <h2>每一次异常，<br />都有人盯着。</h2>
+        <h2>每一次异常，都有人盯着。</h2>
         <span>从真实用户体验到源码错误，把浏览器里的细微信号变成可行动的证据。</span>
       </div>
       <div ref={sceneRef} className={`mascot-scene is-${mode}`} aria-hidden="true">

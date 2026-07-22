@@ -1,7 +1,7 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./components/AppLayout";
-import { LoadingState } from "./components/Ui";
+import { ConnectionSkeleton, HomeLoadingState, PageSkeleton } from "./components/Loading";
 import { DashboardProvider, useDashboard } from "./state/DashboardContext";
 
 const ConnectionPage = lazy(() => import("./pages/ConnectionPage").then((module) => ({ default: module.ConnectionPage })));
@@ -16,23 +16,25 @@ const SourceMapsPage = lazy(() => import("./pages/SourceMapsPage").then((module)
 export function App() {
   return (
     <DashboardProvider>
-      <Suspense fallback={<LoadingState label="正在加载工作台…" />}>
-        <Routes>
-          <Route path="/connect" element={<ConnectionPage />} />
+      <Routes>
+          <Route path="/connect" element={<Suspense fallback={<ConnectionSkeleton />}><ConnectionPage /></Suspense>} />
           <Route element={<ProtectedLayout />}>
-            <Route path="/overview" element={<OverviewPage />} />
-            <Route path="/performance" element={<PerformancePage />} />
-            <Route path="/errors" element={<ErrorsPage />} />
-            <Route path="/errors/:fingerprint" element={<ErrorDetailPage />} />
-            <Route path="/events" element={<EventsPage />} />
-            <Route path="/alerts" element={<AlertsPage />} />
-            <Route path="/source-maps" element={<SourceMapsPage />} />
+            <Route path="/overview" element={<DashboardRoute fallback={<HomeLoadingState />}><OverviewPage /></DashboardRoute>} />
+            <Route path="/performance" element={<DashboardRoute><PerformancePage /></DashboardRoute>} />
+            <Route path="/errors" element={<DashboardRoute><ErrorsPage /></DashboardRoute>} />
+            <Route path="/errors/:fingerprint" element={<DashboardRoute><ErrorDetailPage /></DashboardRoute>} />
+            <Route path="/events" element={<DashboardRoute><EventsPage /></DashboardRoute>} />
+            <Route path="/alerts" element={<DashboardRoute><AlertsPage /></DashboardRoute>} />
+            <Route path="/source-maps" element={<DashboardRoute><SourceMapsPage /></DashboardRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/overview" replace />} />
-        </Routes>
-      </Suspense>
+      </Routes>
     </DashboardProvider>
   );
+}
+
+function DashboardRoute({ children, fallback = <PageSkeleton /> }: { children: ReactNode; fallback?: ReactNode }) {
+  return <Suspense fallback={fallback}>{children}</Suspense>;
 }
 
 function ProtectedLayout() {

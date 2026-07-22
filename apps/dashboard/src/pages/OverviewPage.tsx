@@ -1,5 +1,8 @@
 import { useMemo } from "react";
+import { Activity, ArrowRight, CircleX, TriangleAlert, UsersRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { AppIcon } from "../components/AppIcon";
+import { AsyncPage, HomeLoadingState } from "../components/Loading";
 import { useDashboard } from "../state/DashboardContext";
 import { toApiFilters } from "../state/filters";
 import { useApiData } from "../state/useApiData";
@@ -9,7 +12,6 @@ import {
   ErrorState,
   formatDate,
   formatMetric,
-  LoadingState,
   PageHeader,
   StatCard,
 } from "../components/Ui";
@@ -28,8 +30,8 @@ export function OverviewPage() {
     return { overview, errors, releases };
   }, [client, apiFilters.from, apiFilters.to, apiFilters.environment, apiFilters.release, apiFilters.platform, refreshKey]);
 
-  if (state.loading) return <LoadingState />;
-  if (state.error) return <ErrorState error={state.error} onRetry={refresh} />;
+  if (state.loading) return <HomeLoadingState />;
+  if (state.error && !state.data) return <ErrorState error={state.error} onRetry={refresh} />;
   if (!state.data) return null;
   const { overview, errors, releases } = state.data;
   const errorRate = overview.totalEvents > 0
@@ -38,7 +40,7 @@ export function OverviewPage() {
   const healthy = overview.failedEvents === 0;
 
   return (
-    <div className="page-stack">
+    <AsyncPage refreshing={state.refreshing} error={state.error}>
       <PageHeader eyebrow="OVERVIEW" title="前端稳定性总览" description="从采集入口到处理结果，快速确认当前项目是否健康。" />
       <section className={`health-summary ${healthy ? "healthy" : "degraded"}`}>
         <div className="health-orb"><span /></div>
@@ -46,14 +48,14 @@ export function OverviewPage() {
         <div className="health-meta"><span>错误率<strong>{errorRate}</strong></span><span>等待处理<strong>{overview.pendingEvents}</strong></span><span>最后接收<strong>{overview.latestReceivedAt ? formatDate(overview.latestReceivedAt) : "—"}</strong></span></div>
       </section>
       <section className="stat-grid" aria-label="关键指标">
-        <StatCard label="事件总量" value={overview.totalEvents.toLocaleString()} hint="当前筛选范围" />
-        <StatCard label="错误事件" value={overview.errorEvents.toLocaleString()} hint={`错误率 ${errorRate}`} tone={overview.errorEvents ? "danger" : "default"} />
-        <StatCard label="会话数" value={overview.sessions.toLocaleString()} hint="去重 session_id" />
-        <StatCard label="处理失败" value={overview.failedEvents.toLocaleString()} hint="Processor 最终失败" tone={overview.failedEvents ? "danger" : "success"} />
+        <StatCard label="事件总量" value={overview.totalEvents.toLocaleString()} hint="当前筛选范围" icon={Activity} />
+        <StatCard label="错误事件" value={overview.errorEvents.toLocaleString()} hint={`错误率 ${errorRate}`} icon={TriangleAlert} tone={overview.errorEvents ? "danger" : "default"} />
+        <StatCard label="会话数" value={overview.sessions.toLocaleString()} hint="去重 session_id" icon={UsersRound} />
+        <StatCard label="处理失败" value={overview.failedEvents.toLocaleString()} hint="Processor 最终失败" icon={CircleX} tone={overview.failedEvents ? "danger" : "success"} />
       </section>
       <div className="content-grid two-thirds">
         <section className="panel">
-          <div className="panel-heading"><div><span>WEB VITALS</span><h2>核心体验指标</h2></div><Link to={{ pathname: "/performance", search: location.search }}>查看趋势</Link></div>
+          <div className="panel-heading"><div><span>WEB VITALS</span><h2>核心体验指标</h2></div><Link to={{ pathname: "/performance", search: location.search }}>查看趋势<AppIcon icon={ArrowRight} size="xs" /></Link></div>
           {overview.vitals.length ? (
             <div className="vitals-grid">
               {overview.vitals.map((vital) => (
@@ -82,7 +84,7 @@ export function OverviewPage() {
         </section>
       </div>
       <section className="panel">
-        <div className="panel-heading"><div><span>ERROR GROUPS</span><h2>最近错误</h2></div><Link to={{ pathname: "/errors", search: location.search }}>查看全部</Link></div>
+        <div className="panel-heading"><div><span>ERROR GROUPS</span><h2>最近错误</h2></div><Link to={{ pathname: "/errors", search: location.search }}>查看全部<AppIcon icon={ArrowRight} size="xs" /></Link></div>
         {errors.items.length ? (
           <div className="table-wrap"><table><thead><tr><th>错误</th><th>位置</th><th>最近出现</th><th>次数</th></tr></thead><tbody>
             {errors.items.map((error) => <tr key={error.fingerprint}>
@@ -92,6 +94,6 @@ export function OverviewPage() {
           </tbody></table></div>
         ) : <EmptyState title="当前范围内没有错误" description="这是好消息；也可以在 demo-web 主动触发测试错误。" />}
       </section>
-    </div>
+    </AsyncPage>
   );
 }

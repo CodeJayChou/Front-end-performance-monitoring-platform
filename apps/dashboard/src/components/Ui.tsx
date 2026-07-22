@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { AppIcon } from "./AppIcon";
+export { LoadingState } from "./Loading";
 
 export function PageHeader({
   eyebrow,
@@ -23,23 +26,20 @@ export function PageHeader({
   );
 }
 
-export function StatCard({ label, value, hint, tone = "default" }: {
+export function StatCard({ label, value, hint, icon, tone = "default" }: {
   label: string;
   value: string | number;
   hint: string;
+  icon?: LucideIcon;
   tone?: "default" | "danger" | "success";
 }) {
   return (
     <article className={`stat-card ${tone}`}>
       <div className="stat-label"><span className="stat-indicator" />{label}</div>
-      <div className="stat-value"><strong>{value}</strong><span aria-hidden="true">↗</span></div>
+      <div className="stat-value"><strong>{value}</strong>{icon ? <span><AppIcon icon={icon} size="sm" /></span> : null}</div>
       <small>{hint}</small>
     </article>
   );
-}
-
-export function LoadingState({ label = "正在读取监控数据…" }: { label?: string }) {
-  return <div className="state-box loading"><span className="spinner" aria-hidden="true" />{label}</div>;
 }
 
 export function EmptyState({ title, description }: { title: string; description: string }) {
