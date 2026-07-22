@@ -60,7 +60,7 @@ export function FilterBar() {
         </select>
       </label>
       <button className="refresh-button" type="button" onClick={refresh} aria-label="刷新数据">
-        刷新
+        <span aria-hidden="true">↻</span> 刷新
       </button>
     </div>
   );

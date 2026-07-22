@@ -31,8 +31,8 @@ export function StatCard({ label, value, hint, tone = "default" }: {
 }) {
   return (
     <article className={`stat-card ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <div className="stat-label"><span className="stat-indicator" />{label}</div>
+      <div className="stat-value"><strong>{value}</strong><span aria-hidden="true">↗</span></div>
       <small>{hint}</small>
     </article>
   );

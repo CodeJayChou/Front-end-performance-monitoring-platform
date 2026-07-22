@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ConnectionConfig } from "../api/types";
+import { LoginMascots } from "../components/LoginMascots";
 import { useDashboard } from "../state/DashboardContext";
 
 export function ConnectionPage() {
@@ -11,6 +12,7 @@ export function ConnectionPage() {
     projectId: (import.meta.env.VITE_PROJECT_ID as string | undefined) ?? "demo-project",
     adminKey: "",
   });
+  const [activeField, setActiveField] = useState<keyof ConnectionConfig | null>(null);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -20,36 +22,31 @@ export function ConnectionPage() {
   };
 
   return (
-    <main className="connection-page">
-      <section className="connection-intro">
-        <p className="eyebrow">MONITOR CONSOLE</p>
-        <h1>把浏览器信号变成可行动的证据。</h1>
-        <p>连接本地 Query Service，查看错误、性能指标、版本与原始事件。管理密钥只保存在当前浏览器会话。</p>
-        <div className="signal-flow" aria-label="监控数据链路">
-          <span>SDK</span><i>→</i><span>Ingest</span><i>→</i><span>Process</span><i>→</i><span>Insight</span>
-        </div>
+    <main className="connection-page font-sans text-ink">
+      <LoginMascots mode={activeField === "adminKey" && form.adminKey ? "secret" : activeField ? "typing" : "idle"} />
+      <section className="connection-form-side">
+        <form className="connection-login-form" onSubmit={submit}>
+          <div className="mobile-login-brand"><span className="brand-signal" aria-hidden="true"><span /></span><strong>Pulse</strong></div>
+          <header>
+            <h1>欢迎回来！</h1>
+            <p>连接监控项目，继续查看前端运行状态</p>
+          </header>
+          <label>
+            Query API 地址
+            <input value={form.baseUrl} onFocus={() => setActiveField("baseUrl")} onBlur={() => setActiveField(null)} onChange={(event) => setForm({ ...form, baseUrl: event.target.value })} placeholder="请输入 Query API 地址" required />
+          </label>
+          <label>
+            Project ID
+            <input value={form.projectId} onFocus={() => setActiveField("projectId")} onBlur={() => setActiveField(null)} onChange={(event) => setForm({ ...form, projectId: event.target.value })} placeholder="请输入 Project ID" required />
+          </label>
+          <label>
+            管理密钥
+            <input type="password" value={form.adminKey} onFocus={() => setActiveField("adminKey")} onBlur={() => setActiveField(null)} onChange={(event) => setForm({ ...form, adminKey: event.target.value })} placeholder="请输入管理密钥" autoComplete="off" required />
+          </label>
+          <button className="connection-submit" type="submit"><span>进入监控工作台</span><i aria-hidden="true">→</i></button>
+          <div className="connection-privacy"><span aria-hidden="true">⌁</span><p>管理密钥仅保存在当前浏览器会话，不会写入 URL 或 localStorage。</p></div>
+        </form>
       </section>
-      <form className="connection-card" onSubmit={submit}>
-        <div>
-          <span className="status-dot" aria-hidden="true" />
-          <strong>连接本地项目</strong>
-          <p>默认配置对应当前 Docker MVP。</p>
-        </div>
-        <label>
-          Query API 地址
-          <input value={form.baseUrl} onChange={(event) => setForm({ ...form, baseUrl: event.target.value })} required />
-        </label>
-        <label>
-          Project ID
-          <input value={form.projectId} onChange={(event) => setForm({ ...form, projectId: event.target.value })} required />
-        </label>
-        <label>
-          管理密钥
-          <input type="password" value={form.adminKey} onChange={(event) => setForm({ ...form, adminKey: event.target.value })} placeholder="输入本地 demo 管理密钥" autoComplete="off" required />
-        </label>
-        <button className="primary-button" type="submit">进入监控工作台</button>
-        <small>密钥不会写入 URL 或持久化到 localStorage。</small>
-      </form>
     </main>
   );
 }

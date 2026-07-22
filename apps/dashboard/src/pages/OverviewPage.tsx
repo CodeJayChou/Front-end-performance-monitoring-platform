@@ -35,17 +35,21 @@ export function OverviewPage() {
   const errorRate = overview.totalEvents > 0
     ? `${((overview.errorEvents / overview.totalEvents) * 100).toFixed(1)}%`
     : "0%";
+  const healthy = overview.failedEvents === 0;
 
   return (
     <div className="page-stack">
       <PageHeader eyebrow="OVERVIEW" title="前端稳定性总览" description="从采集入口到处理结果，快速确认当前项目是否健康。" />
+      <section className={`health-summary ${healthy ? "healthy" : "degraded"}`}>
+        <div className="health-orb"><span /></div>
+        <div><span>项目健康状态</span><strong>{healthy ? "运行正常" : "需要关注"}</strong><p>{healthy ? "采集、处理与查询链路均未发现失败事件。" : `当前有 ${overview.failedEvents} 条事件处理失败，请检查 Processor。`}</p></div>
+        <div className="health-meta"><span>错误率<strong>{errorRate}</strong></span><span>等待处理<strong>{overview.pendingEvents}</strong></span><span>最后接收<strong>{overview.latestReceivedAt ? formatDate(overview.latestReceivedAt) : "—"}</strong></span></div>
+      </section>
       <section className="stat-grid" aria-label="关键指标">
         <StatCard label="事件总量" value={overview.totalEvents.toLocaleString()} hint="当前筛选范围" />
         <StatCard label="错误事件" value={overview.errorEvents.toLocaleString()} hint={`错误率 ${errorRate}`} tone={overview.errorEvents ? "danger" : "default"} />
         <StatCard label="会话数" value={overview.sessions.toLocaleString()} hint="去重 session_id" />
         <StatCard label="处理失败" value={overview.failedEvents.toLocaleString()} hint="Processor 最终失败" tone={overview.failedEvents ? "danger" : "success"} />
-        <StatCard label="等待处理" value={overview.pendingEvents.toLocaleString()} hint="pending + processing" tone={overview.pendingEvents ? "danger" : "success"} />
-        <StatCard label="最后处理" value={overview.latestProcessedAt ? formatDate(overview.latestProcessedAt) : "—"} hint={overview.latestReceivedAt ? `最后接收 ${formatDate(overview.latestReceivedAt)}` : "暂无接收数据"} />
       </section>
       <div className="content-grid two-thirds">
         <section className="panel">
